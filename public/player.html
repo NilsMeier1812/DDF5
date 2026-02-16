@@ -12,8 +12,15 @@
         h1 { margin: 0; font-size: 1.5rem; }
         #status { color: #aaa; margin-top: 5px; font-style: italic; }
 
+        /* Login Overlay */
+        #login-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #111; z-index: 1000; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box;}
+        .login-box h2 { color: white; margin-bottom: 20px; }
+        .code-input { font-size: 2rem; padding: 10px; text-align: center; width: 150px; letter-spacing: 5px; border-radius: 10px; border: none; margin-bottom: 20px;}
+        .btn-enter { padding: 15px 30px; font-size: 1.2rem; background: #2ecc71; color: white; border: none; border-radius: 10px; width: 100%; cursor: pointer;}
+
         /* Das Grid für die 4 Buttons */
-        .grid { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 15px; flex-grow: 1; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 15px; flex-grow: 1; opacity: 0.1; /* Ausgegraut bis Login */ pointer-events: none; transition: opacity 0.5s; }
+        .grid.active { opacity: 1; pointer-events: all; }
         
         button { border: none; border-radius: 15px; font-size: 3rem; font-weight: bold; color: white; cursor: pointer; transition: transform 0.1s; box-shadow: 0 4px 0 rgba(0,0,0,0.3); }
         button:active { transform: translateY(4px); box-shadow: none; }
@@ -24,18 +31,27 @@
         .btn-c { background-color: #2ecc71; }
         .btn-d { background-color: #3498db; }
 
-        /* Wenn gevotet wurde */
         .selected { border: 5px solid white; box-shadow: 0 0 20px white; }
     </style>
 </head>
 <body>
+
+    <!-- LOGIN OVERLAY -->
+    <div id="login-overlay">
+        <div class="login-box">
+            <h2>🔑 Code eingeben</h2>
+            <p style="color:#aaa; margin-bottom:20px;" id="login-msg">Bitte den 4-stelligen Code vom Spielleiter eingeben.</p>
+            <input type="tel" maxlength="4" class="code-input" id="player-code" placeholder="0000">
+            <button class="btn-enter" onclick="submitLogin()">Beitreten</button>
+        </div>
+    </div>
 
     <div id="header">
         <h1 id="username">Lade...</h1>
         <div id="status">Warte auf Rundenstart...</div>
     </div>
 
-    <div class="grid">
+    <div class="grid" id="voting-grid">
         <button class="btn-a" id="btn-A" onclick="vote('A')">A</button>
         <button class="btn-b" id="btn-B" onclick="vote('B')">B</button>
         <button class="btn-c" id="btn-C" onclick="vote('C')">C</button>
@@ -46,19 +62,36 @@
     <script>
         const socket = io();
 
-        // Name aus URL holen (/p/Max -> Max)
-        // Wir dekodieren URI Komponenten falls jemand Leerzeichen nutzt
+        // Name aus URL holen
         const pathParts = window.location.pathname.split('/');
         let rawName = pathParts[pathParts.length - 1];
         const username = decodeURIComponent(rawName);
 
         document.getElementById('username').innerText = username;
 
+        // LOGIN LOGIK
+        function submitLogin() {
+            const code = document.getElementById('player-code').value;
+            socket.emit('player_login', { name: username, code: code });
+        }
+
+        socket.on('player_login_success', () => {
+            // Overlay ausblenden
+            document.getElementById('login-overlay').style.display = 'none';
+            // Grid aktivieren
+            document.getElementById('voting-grid').classList.add('active');
+        });
+
+        socket.on('player_login_fail', () => {
+            const msg = document.getElementById('login-msg');
+            msg.innerText = "Falscher Code! Frag den Gamemaster.";
+            msg.style.color = "#e74c3c";
+            document.getElementById('player-code').value = '';
+        });
+
+        // VOTING LOGIK
         function vote(choice) {
-            // Vote senden
             socket.emit('vote', { user: username, choice: choice });
-            
-            // Visuelles Feedback (Buttons kurz deaktivieren oder markieren)
             resetButtons();
             document.getElementById('btn-' + choice).classList.add('selected');
         }
@@ -69,9 +102,7 @@
             });
         }
 
-        // --- EVENTS VOM SERVER ---
-
-        // 1. Darf ich voten?
+        // EVENTS
         socket.on('voting_status', (isOpen) => {
             const statusDiv = document.getElementById('status');
             const buttons = document.querySelectorAll('button');
@@ -80,7 +111,7 @@
                 statusDiv.innerText = "Abstimmung läuft! Tippe jetzt.";
                 statusDiv.style.color = "#2ecc71";
                 buttons.forEach(b => b.disabled = false);
-                resetButtons(); // Auswahl bei neuer Runde resetten
+                resetButtons();
             } else {
                 statusDiv.innerText = "Abstimmung geschlossen.";
                 statusDiv.style.color = "#e74c3c";
@@ -88,7 +119,6 @@
             }
         });
 
-        // 2. Bestätigung vom Server
         socket.on('vote_confirmed', (choice) => {
             document.getElementById('status').innerText = `Gewählt: ${choice}`;
         });
