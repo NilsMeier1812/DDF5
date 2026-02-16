@@ -30,7 +30,6 @@ const GM_PASSWORD = "admin";
 // --- STATUS ---
 let currentGameId = "init_session";
 let players = {}; 
-// Neu: answeringOpen steuert, ob noch Antworten angenommen werden
 let currentRound = { 
     type: 'WAITING', 
     question: '', 
@@ -67,7 +66,6 @@ async function initServer() {
 async function startNewGameInternal() {
     currentGameId = `game_${Date.now()}`;
     players = {};
-    // answeringOpen initial auf false
     currentRound = { type: 'WAITING', question: '', revealed: false, answeringOpen: false, options: [], pairs: [], targetPlayers: [] };
     sessionHistory = [];
     globalRoundCounter = 1;
@@ -82,7 +80,6 @@ async function loadGameData() {
     if (doc.exists) {
         const data = doc.data();
         players = data.players || {};
-        // Defaults wiederherstellen
         currentRound = data.currentRound || { type: 'WAITING', question: '', revealed: false, answeringOpen: false };
         sessionHistory = data.sessionHistory || [];
         globalRoundCounter = data.globalRoundCounter || 1;
@@ -113,7 +110,6 @@ io.on('connection', (socket) => {
     const broadcastStatus = () => {
         const publicPlayers = {};
         for (const [name, data] of Object.entries(players)) {
-            // Antwort nur senden wenn aufgedeckt
             const answerVisible = currentRound.revealed ? data.answer : null;
             publicPlayers[name] = { 
                 lives: data.lives, 
@@ -156,18 +152,16 @@ io.on('connection', (socket) => {
         broadcastStatus();
     });
 
-    // --- SCHRITT 1: VOTING SCHLIESSEN ---
+    // --- GAME CONTROL ---
     socket.on('gm_close_answering', () => {
         currentRound.answeringOpen = false;
-        // Noch NICHT aufdecken, nur schließen
         saveGame();
         broadcastStatus();
     });
 
-    // --- SCHRITT 2: AUFDECKEN ---
     socket.on('gm_reveal', () => {
         currentRound.revealed = true;
-        currentRound.answeringOpen = false; // Sicherstellen dass zu ist
+        currentRound.answeringOpen = false;
         saveGame();
         broadcastStatus();
     });
@@ -202,7 +196,6 @@ io.on('connection', (socket) => {
             globalRoundCounter++;
         } 
 
-        // NEUE RUNDE STARTEN
         currentRound = {
             type: data.type,
             question: data.question,
@@ -212,7 +205,7 @@ io.on('connection', (socket) => {
             min: data.min !== undefined ? Number(data.min) : 0,
             max: data.max !== undefined ? Number(data.max) : 100,
             revealed: false,
-            answeringOpen: true // <--- HIER: Voting öffnen
+            answeringOpen: true 
         };
         
         for (let p in players) {
@@ -232,16 +225,44 @@ io.on('connection', (socket) => {
         }
     });
 
+    // --- PLAYER MANAGEMENT ---
+    
+    // 1. Manuell erstellt vom GM
+    socket.on('gm_create_player', (name) => {
+        if (!name) return;
+        const code = Math.floor(1000 + Math.random() * 9000).toString();
+        
+        if (!players[name]) {
+            players[name] = { 
+                code: code,
+                lives: 3, hasAnswered: false, answer: null, connected: false
+            };
+            saveGame();
+            // Bestätigung an GM (damit das Popup kommt)
+            socket.emit('gm_player_joined', { name, code, isManual: true });
+            broadcastStatus();
+        }
+    });
+
+    // 2. Automatisch durch URL Aufruf
     socket.on('player_announce', (name) => {
+        let isNew = false;
         if (!players[name]) {
             players[name] = { 
                 code: Math.floor(1000 + Math.random() * 9000).toString(),
                 lives: 3, hasAnswered: false, answer: null, connected: true
             };
             saveGame();
+            isNew = true;
         } else {
             players[name].connected = true;
         }
+        
+        // Benachrichtigung an GM, wenn NEUER Spieler
+        if(isNew) {
+            io.to('gamemaster_room').emit('gm_player_joined', { name, code: players[name].code, isManual: false });
+        }
+        
         broadcastStatus();
     });
 
@@ -265,8 +286,6 @@ io.on('connection', (socket) => {
             if (!currentRound.targetPlayers.includes(data.user)) return;
         }
 
-        // NEU: Wir erlauben Antworten SOLANGE answeringOpen = true ist
-        // Wir prüfen NICHT mehr auf hasAnswered, damit man korrigieren kann.
         if (currentRound.answeringOpen) {
             p.answer = data.answer;
             p.hasAnswered = true;
