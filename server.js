@@ -19,8 +19,7 @@ try {
 }
 
 const db = admin.firestore();
-const GAME_DOC_REF = db.collection('gamestate').doc('current_session');
-const ARCHIVE_COL_REF = db.collection('archived_rounds');
+const META_DOC_REF = db.collection('settings').doc('server_state');
 
 const app = express();
 const server = http.createServer(app);
@@ -29,48 +28,83 @@ const io = new Server(server);
 const GM_PASSWORD = "admin"; 
 
 // --- STATUS ---
+let currentGameId = "init_session";
 let players = {}; 
-// Neu: targetPlayers (Array von Namen), min/max (Numbers)
+// Neu: answeringOpen steuert, ob noch Antworten angenommen werden
 let currentRound = { 
     type: 'WAITING', 
     question: '', 
     options: [], 
     pairs: [], 
-    targetPlayers: [], // Leer = Alle, Sonst nur Namen in der Liste
+    targetPlayers: [], 
     min: 0, 
     max: 100, 
-    revealed: false 
+    revealed: false,
+    answeringOpen: false 
 };
 let sessionHistory = [];
 let globalRoundCounter = 1;
 
-// --- DATABASE ---
-async function loadGame() {
+// --- DATABASE HELPER ---
+const getGameDoc = () => db.collection('games').doc(currentGameId);
+const getArchiveCol = () => db.collection('games').doc(currentGameId).collection('archives');
+
+async function initServer() {
     try {
-        const doc = await GAME_DOC_REF.get();
-        if (doc.exists) {
-            const data = doc.data();
-            players = data.players || {};
-            currentRound = data.currentRound || { type: 'WAITING', question: '', revealed: false };
-            sessionHistory = data.sessionHistory || [];
-            globalRoundCounter = data.globalRoundCounter || 1;
-            for (let p in players) players[p].connected = false;
+        const meta = await META_DOC_REF.get();
+        if (meta.exists && meta.data().activeGameId) {
+            currentGameId = meta.data().activeGameId;
+            await loadGameData();
         } else {
-            saveGame();
+            await startNewGameInternal();
         }
-    } catch (e) { console.error("Load Error:", e); }
+    } catch (e) {
+        console.error("Init Error:", e);
+        await startNewGameInternal();
+    }
+}
+
+async function startNewGameInternal() {
+    currentGameId = `game_${Date.now()}`;
+    players = {};
+    // answeringOpen initial auf false
+    currentRound = { type: 'WAITING', question: '', revealed: false, answeringOpen: false, options: [], pairs: [], targetPlayers: [] };
+    sessionHistory = [];
+    globalRoundCounter = 1;
+
+    console.log(`✨ STARTE NEUES SPIEL: ${currentGameId}`);
+    await META_DOC_REF.set({ activeGameId: currentGameId });
+    saveGame();
+}
+
+async function loadGameData() {
+    const doc = await getGameDoc().get();
+    if (doc.exists) {
+        const data = doc.data();
+        players = data.players || {};
+        // Defaults wiederherstellen
+        currentRound = data.currentRound || { type: 'WAITING', question: '', revealed: false, answeringOpen: false };
+        sessionHistory = data.sessionHistory || [];
+        globalRoundCounter = data.globalRoundCounter || 1;
+        
+        for (let p in players) players[p].connected = false;
+    } else {
+        saveGame();
+    }
 }
 
 function saveGame() {
-    GAME_DOC_REF.set({
+    getGameDoc().set({
+        gameId: currentGameId,
         players, currentRound, sessionHistory, globalRoundCounter,
         lastUpdated: admin.firestore.FieldValue.serverTimestamp()
     }).catch(e => console.error("Save Error:", e));
 }
-loadGame();
+
+initServer();
 
 app.use(express.static('public'));
-app.get('/', (req, res) => res.send('Server Online (Firebase Mode).'));
+app.get('/', (req, res) => res.send(`Server Online. Active Game: ${currentGameId}`));
 app.get('/gm', (req, res) => res.sendFile(path.join(__dirname, 'public', 'gamemaster.html')));
 app.get('/p/:name', (req, res) => res.sendFile(path.join(__dirname, 'public', 'player.html')));
 
@@ -79,6 +113,7 @@ io.on('connection', (socket) => {
     const broadcastStatus = () => {
         const publicPlayers = {};
         for (const [name, data] of Object.entries(players)) {
+            // Antwort nur senden wenn aufgedeckt
             const answerVisible = currentRound.revealed ? data.answer : null;
             publicPlayers[name] = { 
                 lives: data.lives, 
@@ -92,14 +127,16 @@ io.on('connection', (socket) => {
             round: currentRound,
             players: publicPlayers,
             history: sessionHistory,
-            roundNumber: globalRoundCounter
+            roundNumber: globalRoundCounter,
+            gameId: currentGameId
         });
 
         io.to('gamemaster_room').emit('gm_update_full', {
             round: currentRound,
             players: players,
             history: sessionHistory,
-            roundNumber: globalRoundCounter
+            roundNumber: globalRoundCounter,
+            gameId: currentGameId
         });
     };
 
@@ -113,14 +150,29 @@ io.on('connection', (socket) => {
         }
     });
 
+    socket.on('gm_reset_all', async () => {
+        saveGame();
+        await startNewGameInternal();
+        broadcastStatus();
+    });
+
+    // --- SCHRITT 1: VOTING SCHLIESSEN ---
+    socket.on('gm_close_answering', () => {
+        currentRound.answeringOpen = false;
+        // Noch NICHT aufdecken, nur schließen
+        saveGame();
+        broadcastStatus();
+    });
+
+    // --- SCHRITT 2: AUFDECKEN ---
     socket.on('gm_reveal', () => {
         currentRound.revealed = true;
+        currentRound.answeringOpen = false; // Sicherstellen dass zu ist
         saveGame();
         broadcastStatus();
     });
 
     socket.on('gm_start_round', async (data) => {
-        // Archivieren
         if (currentRound.type !== 'WAITING') {
             const roundAnswers = {};
             for(const [name, p] of Object.entries(players)) {
@@ -139,7 +191,7 @@ io.on('connection', (socket) => {
             const livesSnapshot = {};
             for (const [name, p] of Object.entries(players)) livesSnapshot[name] = p.lives;
 
-            ARCHIVE_COL_REF.add({
+            getArchiveCol().add({
                 roundId: globalRoundCounter,
                 timestamp: admin.firestore.FieldValue.serverTimestamp(),
                 playerLives: livesSnapshot,
@@ -150,16 +202,17 @@ io.on('connection', (socket) => {
             globalRoundCounter++;
         } 
 
-        // NEUE RUNDE SETZEN
+        // NEUE RUNDE STARTEN
         currentRound = {
             type: data.type,
             question: data.question,
             options: data.options || [], 
             pairs: data.pairs || [],
-            targetPlayers: data.targetPlayers || [], // Array von Namen
+            targetPlayers: data.targetPlayers || [], 
             min: data.min !== undefined ? Number(data.min) : 0,
             max: data.max !== undefined ? Number(data.max) : 100,
-            revealed: false
+            revealed: false,
+            answeringOpen: true // <--- HIER: Voting öffnen
         };
         
         for (let p in players) {
@@ -208,15 +261,13 @@ io.on('connection', (socket) => {
         const p = players[data.user];
         if (!p) return;
 
-        // CHECK: Darf dieser Spieler überhaupt antworten? (Stechen)
         if (currentRound.targetPlayers && currentRound.targetPlayers.length > 0) {
-            if (!currentRound.targetPlayers.includes(data.user)) {
-                // Spieler ist nicht im Stechen dabei -> Ignorieren
-                return;
-            }
+            if (!currentRound.targetPlayers.includes(data.user)) return;
         }
 
-        if (!p.hasAnswered && !currentRound.revealed) {
+        // NEU: Wir erlauben Antworten SOLANGE answeringOpen = true ist
+        // Wir prüfen NICHT mehr auf hasAnswered, damit man korrigieren kann.
+        if (currentRound.answeringOpen) {
             p.answer = data.answer;
             p.hasAnswered = true;
             saveGame();
