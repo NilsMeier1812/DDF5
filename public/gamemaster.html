@@ -7,152 +7,148 @@
     <style>
         body { font-family: 'Segoe UI', sans-serif; margin: 0; padding: 0; background: #f0f2f5; height: 100vh; display: flex; overflow: hidden; }
         
-        /* LOGIN OVERLAY */
         #login-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #2c3e50; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 2000; }
         .login-box { background: white; padding: 40px; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); text-align: center; }
         
-        /* LAYOUT */
         #main-ui { display: none; width: 100%; height: 100%; }
         
-        /* SIDEBAR (SPIELER & LEBEN) */
         .sidebar { width: 300px; background: #fff; border-right: 1px solid #ddd; display: flex; flex-direction: column; overflow-y: auto; }
         .sidebar-header { padding: 20px; background: #2c3e50; color: white; font-weight: bold; }
-        .player-list { list-style: none; padding: 0; margin: 0; }
         .player-row { padding: 15px 20px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
-        .player-info { display: flex; flex-direction: column; }
-        .player-name { font-weight: bold; font-size: 1.1rem; }
-        .player-code { font-size: 0.8rem; color: #7f8c8d; font-family: monospace; background: #eee; padding: 2px 5px; border-radius: 4px; display: inline-block; margin-top: 4px;}
-        
+        .player-name { font-weight: bold; }
+        .player-code { font-size: 0.8rem; color: #7f8c8d; background: #eee; padding: 2px 5px; border-radius: 4px; }
         .lives-control { display: flex; align-items: center; gap: 5px; }
-        .heart { color: #e74c3c; }
-        .btn-mini { padding: 2px 8px; font-size: 0.8rem; cursor: pointer; border: 1px solid #ccc; background: #fff; border-radius: 4px; }
-        .btn-mini:hover { background: #eee; }
-        
-        .status-dot { width: 10px; height: 10px; border-radius: 50%; background: #ccc; margin-right: 10px; display: inline-block; }
-        .status-dot.active { background: #2ecc71; box-shadow: 0 0 5px #2ecc71; } /* Hat geantwortet */
+        .status-dot { width: 10px; height: 10px; border-radius: 50%; background: #ccc; margin-right: 10px; }
+        .status-dot.active { background: #2ecc71; box-shadow: 0 0 5px #2ecc71; }
 
-        /* MAIN AREA */
         .content { flex: 1; padding: 30px; display: flex; flex-direction: column; overflow-y: auto; }
-        
         .top-bar { display: flex; justify-content: space-between; margin-bottom: 20px; align-items: center; }
-        .btn-new-q { background: #3498db; color: white; padding: 12px 25px; border: none; border-radius: 5px; font-size: 1.1rem; cursor: pointer; font-weight: bold; box-shadow: 0 4px 0 #2980b9; }
-        .btn-new-q:active { transform: translateY(4px); box-shadow: none; }
+        
+        /* Buttons */
+        .btn-new-q { background: #3498db; color: white; padding: 12px 25px; border: none; border-radius: 5px; font-size: 1.1rem; cursor: pointer; font-weight: bold; }
+        .btn-reveal { background: #f39c12; color: white; padding: 12px 25px; border: none; border-radius: 5px; font-size: 1.1rem; cursor: pointer; font-weight: bold; margin-right: 10px;}
+        .btn-reveal:hover { background: #e67e22; }
+        .btn-reveal:disabled { background: #bdc3c7; cursor: not-allowed; }
 
-        .current-question { background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; border-left: 5px solid #3498db; }
-        .current-question h2 { margin: 0 0 10px 0; color: #2c3e50; }
-        .current-question p { margin: 0; color: #7f8c8d; font-style: italic; }
-
+        .current-question { background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; border-left: 5px solid #3498db; display: flex; justify-content: space-between; align-items: center;}
         .answers-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; }
         .answer-card { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); border: 1px solid #eee; }
-        .answer-card strong { display: block; margin-bottom: 5px; color: #2c3e50; }
-        .answer-val { font-size: 1.2rem; font-weight: bold; color: #3498db; }
         
-        /* MODAL */
-        dialog { border: none; border-radius: 8px; padding: 0; box-shadow: 0 10px 40px rgba(0,0,0,0.3); width: 400px; }
+        dialog { border: none; border-radius: 8px; padding: 0; box-shadow: 0 10px 40px rgba(0,0,0,0.3); width: 600px; max-width: 90%; }
         dialog::backdrop { background: rgba(0,0,0,0.5); }
         .modal-header { background: #f8f9fa; padding: 15px 20px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
         .modal-body { padding: 20px; display: flex; flex-direction: column; gap: 15px; }
-        .modal-footer { padding: 15px 20px; border-top: 1px solid #eee; text-align: right; }
+        .modal-footer { padding: 15px 20px; border-top: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;}
         
         input, select { padding: 10px; width: 100%; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
-        .hidden { display: none; }
-
+        
+        .btn-reset-round { background: #c0392b; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer; font-size: 0.9rem; font-weight: bold;}
+        .btn-cancel { padding: 10px 15px; cursor: pointer; border: 1px solid #ccc; background: #fff; border-radius: 4px; }
+        .btn-start { background: #2ecc71; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 1rem;}
+        .btn-mini { padding: 2px 8px; cursor: pointer; border: 1px solid #ccc; background: #fff; border-radius: 4px; }
     </style>
 </head>
 <body>
 
-    <!-- LOGIN -->
     <div id="login-overlay">
         <div class="login-box">
-            <h2 style="margin-top:0;">🔒 GM Login</h2>
+            <h2>🔒 GM Login</h2>
             <input type="password" id="gm-password" placeholder="Passwort" onkeyup="if(event.key === 'Enter') login()">
             <br><br>
-            <button class="btn-new-q" onclick="login()">Starten</button>
+            <button class="btn-new-q" onclick="login()">Einloggen</button>
         </div>
     </div>
 
     <div id="main-ui">
-        <!-- SIDEBAR -->
         <div class="sidebar">
-            <div class="sidebar-header">
-                Teilnehmer & Leben
-            </div>
-            <ul class="player-list" id="sidebar-list">
-                <!-- Dynamisch -->
-            </ul>
+            <div class="sidebar-header">Teilnehmer</div>
+            <div id="sidebar-list"></div>
         </div>
 
-        <!-- MAIN -->
         <div class="content">
             <div class="top-bar">
-                <h1>🎮 Gamemaster</h1>
-                <button class="btn-new-q" onclick="openModal()">+ Neue Frage / Runde</button>
+                <h1>Gamemaster</h1>
+                <div>
+                    <!-- Der Reveal Button -->
+                    <button id="btn-reveal" class="btn-reveal" onclick="reveal()">👁️ Auflösen</button>
+                    <button class="btn-new-q" onclick="openModal()">+ Nächste Frage</button>
+                </div>
             </div>
 
             <div class="current-question">
-                <h2 id="q-text">Warte auf Rundenstart...</h2>
-                <p id="q-type">Modus: Lobby</p>
+                <div>
+                    <h2 id="q-text" style="margin:0;">...</h2>
+                    <p id="q-type" style="margin:5px 0 0 0; color:#777;">...</p>
+                </div>
+                <div style="text-align:right;">
+                    <strong style="font-size:2rem; color:#3498db;" id="answer-count">0</strong>
+                    <div style="font-size:0.8rem;">Antworten</div>
+                </div>
             </div>
 
-            <h3>Eingehende Antworten:</h3>
-            <div class="answers-grid" id="answers-area">
-                <!-- Antworten erscheinen hier -->
-            </div>
+            <div class="answers-grid" id="answers-area"></div>
         </div>
     </div>
 
-    <!-- MODAL FÜR NEUE FRAGE -->
     <dialog id="q-modal">
         <div class="modal-header">
-            <strong>Neue Runde starten</strong>
-            <button onclick="closeModal()" style="background:none; border:none; font-size:1.2rem; cursor:pointer;">&times;</button>
+            <strong>Steuerung</strong>
+            <button onclick="closeModal()" style="background:none; border:none; cursor:pointer; font-size:1.5rem;">&times;</button>
         </div>
         <div class="modal-body">
-            <label>Typ:</label>
-            <select id="m-type" onchange="toggleModalFields()">
-                <option value="MC">Multiple Choice (A/B/C/D)</option>
-                <option value="TEXT">Textantwort</option>
-                <option value="PLAYER_VOTE">Lebensfrage (Wer verliert?)</option>
+            <label><strong>Modus wählen:</strong></label>
+            <select id="m-type">
+                <option value="MC">Frage: Multiple Choice (A/B/C/D)</option>
+                <option value="TEXT">Frage: Textantwort</option>
+                <option value="PLAYER_VOTE">Voting: Wer verliert Leben?</option>
             </select>
 
-            <label>Frage / Anweisung:</label>
-            <input type="text" id="m-question" placeholder="z.B. Wie hoch ist der Eiffelturm?">
+            <label><strong>Frage / Anweisung:</strong></label>
+            <input type="text" id="m-question" placeholder="Fragetext eingeben...">
         </div>
         <div class="modal-footer">
-            <button class="btn-mini" onclick="closeModal()">Abbrechen</button>
-            <button class="btn-new-q" style="font-size:0.9rem; padding: 8px 15px;" onclick="startRound()">Absenden</button>
+            <button class="btn-reset-round" onclick="startRound(true)">⚠️ Neue Spielrunde (Archiv leeren)</button>
+            <div style="display:flex; gap:10px;">
+                <button class="btn-cancel" onclick="closeModal()">Abbrechen</button>
+                <button class="btn-start" onclick="startRound(false)">Starten</button>
+            </div>
         </div>
     </dialog>
 
     <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io();
-        let allPlayersData = {}; // Cache für Spielernamen bei Vote
 
-        // --- LOGIN ---
         function login() { socket.emit('gm_login', document.getElementById('gm-password').value); }
         socket.on('gm_login_success', () => {
             document.getElementById('login-overlay').style.display = 'none';
             document.getElementById('main-ui').style.display = 'flex';
         });
 
-        // --- MODAL LOGIK ---
         const modal = document.getElementById('q-modal');
         function openModal() { modal.showModal(); }
         function closeModal() { modal.close(); }
         
-        function startRound() {
+        function startRound(isNewGameRound) {
             const type = document.getElementById('m-type').value;
             const text = document.getElementById('m-question').value;
-            
-            socket.emit('gm_start_round', { type: type, question: text });
+            const qText = text || (type === 'PLAYER_VOTE' ? 'Wer verliert ein Leben?' : 'Frage');
+
+            if(isNewGameRound) {
+                if(!confirm("⚠️ Neue Runde starten?\nAlle aktuellen Antworten werden archiviert/gelöscht.")) return;
+            }
+
+            socket.emit('gm_start_round', { type: type, question: qText, isNewGameRound: isNewGameRound });
             closeModal();
             document.getElementById('m-question').value = '';
         }
 
-        // --- UPDATE LOGIK ---
+        // AUFDECKEN
+        function reveal() {
+            socket.emit('gm_reveal');
+        }
+
         socket.on('gm_update_full', (data) => {
-            allPlayersData = data.players;
             renderSidebar(data.players);
             renderMainArea(data.round, data.players);
         });
@@ -160,67 +156,60 @@
         function renderSidebar(players) {
             const list = document.getElementById('sidebar-list');
             list.innerHTML = '';
-            
             for (const [name, p] of Object.entries(players)) {
-                const li = document.createElement('li');
-                li.className = 'player-row';
-                
-                // Status Punkt (Grün wenn geantwortet)
+                const row = document.createElement('div');
+                row.className = 'player-row';
                 const dotClass = p.hasAnswered ? 'status-dot active' : 'status-dot';
-                
-                li.innerHTML = `
+                row.innerHTML = `
                     <div style="display:flex; align-items:center;">
                         <span class="${dotClass}"></span>
-                        <div class="player-info">
-                            <span class="player-name">${name}</span>
-                            <span class="player-code">${p.code}</span>
-                        </div>
+                        <div><div class="player-name">${name}</div><span class="player-code">${p.code}</span></div>
                     </div>
                     <div class="lives-control">
                         <button class="btn-mini" onclick="modLife('${name}', -1)">-</button>
-                        <span style="font-weight:bold; width:20px; text-align:center;">${p.lives}</span>
-                        <span class="heart">❤️</span>
+                        <span style="min-width:30px; text-align:center;">${p.lives}❤️</span>
                         <button class="btn-mini" onclick="modLife('${name}', 1)">+</button>
-                    </div>
-                `;
-                list.appendChild(li);
+                    </div>`;
+                list.appendChild(row);
             }
         }
 
         function renderMainArea(round, players) {
-            // Header Update
-            document.getElementById('q-text').innerText = round.question || "Keine aktive Frage";
+            document.getElementById('q-text').innerText = round.question || "Pause";
+            document.getElementById('q-type').innerText = round.type;
             
-            let typeText = "Lobby";
-            if(round.type === 'MC') typeText = "Multiple Choice";
-            if(round.type === 'TEXT') typeText = "Textantwort";
-            if(round.type === 'PLAYER_VOTE') typeText = "Lebensfrage (Voting)";
-            document.getElementById('q-type').innerText = typeText;
+            // Reveal Button Logic
+            const btnReveal = document.getElementById('btn-reveal');
+            if (round.revealed || round.type === 'WAITING') {
+                btnReveal.style.display = 'none';
+            } else {
+                btnReveal.style.display = 'inline-block';
+            }
 
-            // Antworten rendern
             const grid = document.getElementById('answers-area');
             grid.innerHTML = '';
 
+            let count = 0;
             for (const [name, p] of Object.entries(players)) {
+                if (p.hasAnswered) count++;
+                
                 if (p.hasAnswered && p.answer) {
                     const card = document.createElement('div');
                     card.className = 'answer-card';
-                    card.innerHTML = `
-                        <strong>${name}</strong>
-                        <div class="answer-val">${p.answer}</div>
-                    `;
+                    if (round.type === 'PLAYER_VOTE') {
+                        card.style.borderLeft = "5px solid #e74c3c";
+                        card.innerHTML = `<strong>${name} wählt:</strong><div style="font-size:1.5rem">${p.answer}</div>`;
+                    } else {
+                        card.innerHTML = `<strong>${name}</strong><div style="font-size:1.2rem; color:#3498db;">${p.answer}</div>`;
+                    }
                     grid.appendChild(card);
                 }
             }
+            document.getElementById('answer-count').innerText = count;
         }
 
-        function modLife(user, amount) {
-            socket.emit('gm_modify_lives', { user, amount });
-        }
-
-        // Keep Alive
+        function modLife(user, amount) { socket.emit('gm_modify_lives', { user, amount }); }
         setInterval(() => { fetch('/').catch(e => {}) }, 240000);
-
     </script>
 </body>
 </html>
