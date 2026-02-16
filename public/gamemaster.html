@@ -5,175 +5,220 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GM Control</title>
     <style>
-        body { font-family: sans-serif; padding: 20px; max-width: 900px; margin: 0 auto; background: #f4f4f4; }
-        h1 { text-align: center; color: #333; }
+        body { font-family: 'Segoe UI', sans-serif; margin: 0; padding: 0; background: #f0f2f5; height: 100vh; display: flex; overflow: hidden; }
         
-        /* Login Overlay Style */
-        #login-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #222; display: flex; justify-content: center; align-items: center; z-index: 1000; }
-        .login-box { background: white; padding: 30px; border-radius: 10px; text-align: center; }
-        input { padding: 10px; font-size: 1.2rem; border-radius: 5px; border: 1px solid #ccc; margin-bottom: 10px; }
+        /* LOGIN OVERLAY */
+        #login-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #2c3e50; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 2000; }
+        .login-box { background: white; padding: 40px; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); text-align: center; }
         
-        /* Haupt UI (versteckt bis Login) */
-        #main-ui { display: none; }
+        /* LAYOUT */
+        #main-ui { display: none; width: 100%; height: 100%; }
+        
+        /* SIDEBAR (SPIELER & LEBEN) */
+        .sidebar { width: 300px; background: #fff; border-right: 1px solid #ddd; display: flex; flex-direction: column; overflow-y: auto; }
+        .sidebar-header { padding: 20px; background: #2c3e50; color: white; font-weight: bold; }
+        .player-list { list-style: none; padding: 0; margin: 0; }
+        .player-row { padding: 15px 20px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
+        .player-info { display: flex; flex-direction: column; }
+        .player-name { font-weight: bold; font-size: 1.1rem; }
+        .player-code { font-size: 0.8rem; color: #7f8c8d; font-family: monospace; background: #eee; padding: 2px 5px; border-radius: 4px; display: inline-block; margin-top: 4px;}
+        
+        .lives-control { display: flex; align-items: center; gap: 5px; }
+        .heart { color: #e74c3c; }
+        .btn-mini { padding: 2px 8px; font-size: 0.8rem; cursor: pointer; border: 1px solid #ccc; background: #fff; border-radius: 4px; }
+        .btn-mini:hover { background: #eee; }
+        
+        .status-dot { width: 10px; height: 10px; border-radius: 50%; background: #ccc; margin-right: 10px; display: inline-block; }
+        .status-dot.active { background: #2ecc71; box-shadow: 0 0 5px #2ecc71; } /* Hat geantwortet */
 
-        /* Grid Layout */
-        .dashboard { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        /* MAIN AREA */
+        .content { flex: 1; padding: 30px; display: flex; flex-direction: column; overflow-y: auto; }
         
-        .panel { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-        
-        .controls { display: flex; gap: 10px; margin-bottom: 20px; }
-        button { padding: 10px 20px; font-size: 1rem; cursor: pointer; border: none; border-radius: 5px; color: white; font-weight: bold;}
-        .btn-login { background: #333; width: 100%; margin-top: 10px; }
-        .btn-start { background: #2ecc71; flex: 1; }
-        .btn-stop { background: #e74c3c; flex: 1; }
-        .btn-add { background: #3498db; }
+        .top-bar { display: flex; justify-content: space-between; margin-bottom: 20px; align-items: center; }
+        .btn-new-q { background: #3498db; color: white; padding: 12px 25px; border: none; border-radius: 5px; font-size: 1.1rem; cursor: pointer; font-weight: bold; box-shadow: 0 4px 0 #2980b9; }
+        .btn-new-q:active { transform: translateY(4px); box-shadow: none; }
 
-        .vote-item { padding: 8px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; }
-        .player-code-item { padding: 8px; border-bottom: 1px solid #eee; font-family: monospace; font-size: 1.1rem; display: flex; justify-content: space-between; }
+        .current-question { background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; border-left: 5px solid #3498db; }
+        .current-question h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .current-question p { margin: 0; color: #7f8c8d; font-style: italic; }
+
+        .answers-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; }
+        .answer-card { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); border: 1px solid #eee; }
+        .answer-card strong { display: block; margin-bottom: 5px; color: #2c3e50; }
+        .answer-val { font-size: 1.2rem; font-weight: bold; color: #3498db; }
         
-        .vote-choice { font-weight: bold; padding: 2px 8px; border-radius: 4px; color: white;}
-        .choice-A { background: #e74c3c; }
-        .choice-B { background: #f1c40f; color: black; }
-        .choice-C { background: #2ecc71; }
-        .choice-D { background: #3498db; }
+        /* MODAL */
+        dialog { border: none; border-radius: 8px; padding: 0; box-shadow: 0 10px 40px rgba(0,0,0,0.3); width: 400px; }
+        dialog::backdrop { background: rgba(0,0,0,0.5); }
+        .modal-header { background: #f8f9fa; padding: 15px 20px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
+        .modal-body { padding: 20px; display: flex; flex-direction: column; gap: 15px; }
+        .modal-footer { padding: 15px 20px; border-top: 1px solid #eee; text-align: right; }
+        
+        input, select { padding: 10px; width: 100%; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
+        .hidden { display: none; }
+
     </style>
 </head>
 <body>
 
-    <!-- LOGIN SCREEN -->
+    <!-- LOGIN -->
     <div id="login-overlay">
         <div class="login-box">
-            <h2>🔒 Gamemaster Login</h2>
+            <h2 style="margin-top:0;">🔒 GM Login</h2>
             <input type="password" id="gm-password" placeholder="Passwort" onkeyup="if(event.key === 'Enter') login()">
-            <br>
-            <button class="btn-login" onclick="login()">Einloggen</button>
-            <p id="login-error" style="color:red; display:none;">Falsches Passwort!</p>
+            <br><br>
+            <button class="btn-new-q" onclick="login()">Starten</button>
         </div>
     </div>
 
-    <!-- MAIN UI -->
     <div id="main-ui">
-        <h1>🎮 Gamemaster Zentrale</h1>
-        
-        <div class="controls">
-            <button class="btn-start" onclick="sendAction('reset')">▶ Neue Runde / Reset</button>
-            <button class="btn-stop" onclick="sendAction('stop')">⏹ Stop Voting</button>
+        <!-- SIDEBAR -->
+        <div class="sidebar">
+            <div class="sidebar-header">
+                Teilnehmer & Leben
+            </div>
+            <ul class="player-list" id="sidebar-list">
+                <!-- Dynamisch -->
+            </ul>
         </div>
 
-        <div class="dashboard">
-            <!-- Linkes Panel: Ergebnisse -->
-            <div class="panel">
-                <h3>Live Ergebnisse (<span id="count">0</span>)</h3>
-                <div id="vote-list">
-                    <p style="color:#999; text-align:center;">Warte auf Votes...</p>
-                </div>
+        <!-- MAIN -->
+        <div class="content">
+            <div class="top-bar">
+                <h1>🎮 Gamemaster</h1>
+                <button class="btn-new-q" onclick="openModal()">+ Neue Frage / Runde</button>
             </div>
 
-            <!-- Rechtes Panel: Spieler Management -->
-            <div class="panel">
-                <h3>👥 Spieler Verwaltung</h3>
-                <div style="display:flex; gap:5px; margin-bottom:15px;">
-                    <input type="text" id="new-player-name" placeholder="Name (z.B. Max)" style="flex:1; margin:0;">
-                    <button class="btn-add" onclick="createPlayer()">Code generieren</button>
-                </div>
-                <div id="player-list">
-                    <!-- Hier kommen die Codes hin -->
-                </div>
+            <div class="current-question">
+                <h2 id="q-text">Warte auf Rundenstart...</h2>
+                <p id="q-type">Modus: Lobby</p>
+            </div>
+
+            <h3>Eingehende Antworten:</h3>
+            <div class="answers-grid" id="answers-area">
+                <!-- Antworten erscheinen hier -->
             </div>
         </div>
     </div>
+
+    <!-- MODAL FÜR NEUE FRAGE -->
+    <dialog id="q-modal">
+        <div class="modal-header">
+            <strong>Neue Runde starten</strong>
+            <button onclick="closeModal()" style="background:none; border:none; font-size:1.2rem; cursor:pointer;">&times;</button>
+        </div>
+        <div class="modal-body">
+            <label>Typ:</label>
+            <select id="m-type" onchange="toggleModalFields()">
+                <option value="MC">Multiple Choice (A/B/C/D)</option>
+                <option value="TEXT">Textantwort</option>
+                <option value="PLAYER_VOTE">Lebensfrage (Wer verliert?)</option>
+            </select>
+
+            <label>Frage / Anweisung:</label>
+            <input type="text" id="m-question" placeholder="z.B. Wie hoch ist der Eiffelturm?">
+        </div>
+        <div class="modal-footer">
+            <button class="btn-mini" onclick="closeModal()">Abbrechen</button>
+            <button class="btn-new-q" style="font-size:0.9rem; padding: 8px 15px;" onclick="startRound()">Absenden</button>
+        </div>
+    </dialog>
 
     <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io();
+        let allPlayersData = {}; // Cache für Spielernamen bei Vote
 
-        // LOGIN LOGIK
-        function login() {
-            const pw = document.getElementById('gm-password').value;
-            socket.emit('gm_login', pw);
-        }
-
-        socket.on('gm_login_success', (data) => {
+        // --- LOGIN ---
+        function login() { socket.emit('gm_login', document.getElementById('gm-password').value); }
+        socket.on('gm_login_success', () => {
             document.getElementById('login-overlay').style.display = 'none';
-            document.getElementById('main-ui').style.display = 'block';
-            
-            // Bestehende Spieler laden
-            renderPlayerList(data.players);
-            // Bestehende Votes laden
-            renderVotes(data.votes);
+            document.getElementById('main-ui').style.display = 'flex';
         });
 
-        socket.on('gm_login_fail', () => {
-            document.getElementById('login-error').style.display = 'block';
-        });
-
-
-        // GAME LOGIK
-        function sendAction(action) {
-            socket.emit('gm_control', action);
-        }
-
-        // PLAYER MANAGEMENT
-        function createPlayer() {
-            const nameInput = document.getElementById('new-player-name');
-            const name = nameInput.value.trim();
-            if(!name) return;
-            
-            socket.emit('gm_create_player', name);
-            nameInput.value = ''; // Reset Input
-        }
-
-        socket.on('player_created', (data) => {
-            // data = { name: "Max", code: "1234" }
-            addPlayerToUI(data.name, data.code);
-        });
-
-        function addPlayerToUI(name, code) {
-            const list = document.getElementById('player-list');
-            const div = document.createElement('div');
-            div.className = 'player-code-item';
-            div.innerHTML = `<span>${name}</span> <span>Code: <b>${code}</b></span>`;
-            list.prepend(div);
-        }
+        // --- MODAL LOGIK ---
+        const modal = document.getElementById('q-modal');
+        function openModal() { modal.showModal(); }
+        function closeModal() { modal.close(); }
         
-        function renderPlayerList(players) {
-            const list = document.getElementById('player-list');
-            list.innerHTML = '';
-            for (const [name, code] of Object.entries(players)) {
-                addPlayerToUI(name, code);
-            }
+        function startRound() {
+            const type = document.getElementById('m-type').value;
+            const text = document.getElementById('m-question').value;
+            
+            socket.emit('gm_start_round', { type: type, question: text });
+            closeModal();
+            document.getElementById('m-question').value = '';
         }
 
-        // VOTE RENDERING
-        socket.on('update_votes', (votes) => {
-            renderVotes(votes);
+        // --- UPDATE LOGIK ---
+        socket.on('gm_update_full', (data) => {
+            allPlayersData = data.players;
+            renderSidebar(data.players);
+            renderMainArea(data.round, data.players);
         });
 
-        function renderVotes(votes) {
-            const list = document.getElementById('vote-list');
-            const countSpan = document.getElementById('count');
-            
+        function renderSidebar(players) {
+            const list = document.getElementById('sidebar-list');
             list.innerHTML = '';
-            const total = Object.keys(votes).length;
-            countSpan.innerText = total;
-
-            if (total === 0) {
-                list.innerHTML = '<p style="color:#999; text-align:center;">Warte auf Votes...</p>';
-                return;
-            }
-
-            for (const [user, choice] of Object.entries(votes)) {
-                const div = document.createElement('div');
-                div.className = 'vote-item';
-                div.innerHTML = `
-                    <span>👤 ${user}</span>
-                    <span class="vote-choice choice-${choice}">${choice}</span>
+            
+            for (const [name, p] of Object.entries(players)) {
+                const li = document.createElement('li');
+                li.className = 'player-row';
+                
+                // Status Punkt (Grün wenn geantwortet)
+                const dotClass = p.hasAnswered ? 'status-dot active' : 'status-dot';
+                
+                li.innerHTML = `
+                    <div style="display:flex; align-items:center;">
+                        <span class="${dotClass}"></span>
+                        <div class="player-info">
+                            <span class="player-name">${name}</span>
+                            <span class="player-code">${p.code}</span>
+                        </div>
+                    </div>
+                    <div class="lives-control">
+                        <button class="btn-mini" onclick="modLife('${name}', -1)">-</button>
+                        <span style="font-weight:bold; width:20px; text-align:center;">${p.lives}</span>
+                        <span class="heart">❤️</span>
+                        <button class="btn-mini" onclick="modLife('${name}', 1)">+</button>
+                    </div>
                 `;
-                list.appendChild(div);
+                list.appendChild(li);
             }
         }
 
-        // KEEP ALIVE
+        function renderMainArea(round, players) {
+            // Header Update
+            document.getElementById('q-text').innerText = round.question || "Keine aktive Frage";
+            
+            let typeText = "Lobby";
+            if(round.type === 'MC') typeText = "Multiple Choice";
+            if(round.type === 'TEXT') typeText = "Textantwort";
+            if(round.type === 'PLAYER_VOTE') typeText = "Lebensfrage (Voting)";
+            document.getElementById('q-type').innerText = typeText;
+
+            // Antworten rendern
+            const grid = document.getElementById('answers-area');
+            grid.innerHTML = '';
+
+            for (const [name, p] of Object.entries(players)) {
+                if (p.hasAnswered && p.answer) {
+                    const card = document.createElement('div');
+                    card.className = 'answer-card';
+                    card.innerHTML = `
+                        <strong>${name}</strong>
+                        <div class="answer-val">${p.answer}</div>
+                    `;
+                    grid.appendChild(card);
+                }
+            }
+        }
+
+        function modLife(user, amount) {
+            socket.emit('gm_modify_lives', { user, amount });
+        }
+
+        // Keep Alive
         setInterval(() => { fetch('/').catch(e => {}) }, 240000);
 
     </script>
