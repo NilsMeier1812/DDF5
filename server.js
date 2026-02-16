@@ -20,6 +20,7 @@ try {
 
 const db = admin.firestore();
 const GAME_DOC_REF = db.collection('gamestate').doc('current_session');
+const ARCHIVE_COL_REF = db.collection('archived_rounds');
 
 const app = express();
 const server = http.createServer(app);
@@ -29,9 +30,19 @@ const GM_PASSWORD = "admin";
 
 // --- STATUS ---
 let players = {}; 
-// Neu: 'revealed' Flag
-let currentRound = { type: 'WAITING', question: '', options: [], revealed: false };
+// Neu: targetPlayers (Array von Namen), min/max (Numbers)
+let currentRound = { 
+    type: 'WAITING', 
+    question: '', 
+    options: [], 
+    pairs: [], 
+    targetPlayers: [], // Leer = Alle, Sonst nur Namen in der Liste
+    min: 0, 
+    max: 100, 
+    revealed: false 
+};
 let sessionHistory = [];
+let globalRoundCounter = 1;
 
 // --- DATABASE ---
 async function loadGame() {
@@ -42,6 +53,7 @@ async function loadGame() {
             players = data.players || {};
             currentRound = data.currentRound || { type: 'WAITING', question: '', revealed: false };
             sessionHistory = data.sessionHistory || [];
+            globalRoundCounter = data.globalRoundCounter || 1;
             for (let p in players) players[p].connected = false;
         } else {
             saveGame();
@@ -51,7 +63,7 @@ async function loadGame() {
 
 function saveGame() {
     GAME_DOC_REF.set({
-        players, currentRound, sessionHistory,
+        players, currentRound, sessionHistory, globalRoundCounter,
         lastUpdated: admin.firestore.FieldValue.serverTimestamp()
     }).catch(e => console.error("Save Error:", e));
 }
@@ -64,33 +76,30 @@ app.get('/p/:name', (req, res) => res.sendFile(path.join(__dirname, 'public', 'p
 
 io.on('connection', (socket) => {
     
-    // --- STATUS AN ALLE SENDEN ---
     const broadcastStatus = () => {
         const publicPlayers = {};
         for (const [name, data] of Object.entries(players)) {
-            // WICHTIG: Antwort nur mitschicken, wenn aufgedeckt wurde!
-            // (Oder wenn es der Spieler selbst ist, das handhaben wir aber clientseitig meistens)
             const answerVisible = currentRound.revealed ? data.answer : null;
-
             publicPlayers[name] = { 
                 lives: data.lives, 
                 hasAnswered: data.hasAnswered,
                 connected: data.connected,
-                answer: answerVisible // Hier ist das Geheimnis
+                answer: answerVisible
             };
         }
         
         io.emit('update_game_state', {
             round: currentRound,
             players: publicPlayers,
-            history: sessionHistory 
+            history: sessionHistory,
+            roundNumber: globalRoundCounter
         });
 
-        // GM sieht IMMER alles
         io.to('gamemaster_room').emit('gm_update_full', {
             round: currentRound,
             players: players,
-            history: sessionHistory
+            history: sessionHistory,
+            roundNumber: globalRoundCounter
         });
     };
 
@@ -104,23 +113,15 @@ io.on('connection', (socket) => {
         }
     });
 
-    // --- AUFDECKEN ---
     socket.on('gm_reveal', () => {
         currentRound.revealed = true;
         saveGame();
         broadcastStatus();
     });
 
-    // --- STARTEN ---
-    socket.on('gm_start_round', (data) => {
-        // 1. NEUE SPIELRUNDE (Alles resetten)
-        if (data.isNewGameRound) {
-            // Vorher speichern wir den finalen Stand der letzten Runde nochmal explizit
-            saveGame(); 
-            sessionHistory = []; // RAM leeren für neue Runde
-        } 
-        // 2. NÄCHSTE FRAGE (Alte archivieren)
-        else if (currentRound.type !== 'WAITING') {
+    socket.on('gm_start_round', async (data) => {
+        // Archivieren
+        if (currentRound.type !== 'WAITING') {
             const roundAnswers = {};
             for(const [name, p] of Object.entries(players)) {
                 if (p.hasAnswered && p.answer) {
@@ -129,16 +130,36 @@ io.on('connection', (socket) => {
             }
             sessionHistory.push({
                 question: currentRound.question,
+                type: currentRound.type,
                 answers: roundAnswers
             });
         }
 
-        // Neue Runde init
+        if (data.isNewGameRound) {
+            const livesSnapshot = {};
+            for (const [name, p] of Object.entries(players)) livesSnapshot[name] = p.lives;
+
+            ARCHIVE_COL_REF.add({
+                roundId: globalRoundCounter,
+                timestamp: admin.firestore.FieldValue.serverTimestamp(),
+                playerLives: livesSnapshot,
+                questions: sessionHistory
+            }).catch(e => console.error("Archiv Fehler:", e));
+
+            sessionHistory = []; 
+            globalRoundCounter++;
+        } 
+
+        // NEUE RUNDE SETZEN
         currentRound = {
             type: data.type,
             question: data.question,
-            options: [],
-            revealed: false // Reset Reveal
+            options: data.options || [], 
+            pairs: data.pairs || [],
+            targetPlayers: data.targetPlayers || [], // Array von Namen
+            min: data.min !== undefined ? Number(data.min) : 0,
+            max: data.max !== undefined ? Number(data.max) : 100,
+            revealed: false
         };
         
         for (let p in players) {
@@ -185,8 +206,17 @@ io.on('connection', (socket) => {
 
     socket.on('submit_answer', (data) => {
         const p = players[data.user];
-        // Antworten nur erlaubt, wenn noch NICHT aufgedeckt wurde
-        if (p && !p.hasAnswered && !currentRound.revealed) {
+        if (!p) return;
+
+        // CHECK: Darf dieser Spieler überhaupt antworten? (Stechen)
+        if (currentRound.targetPlayers && currentRound.targetPlayers.length > 0) {
+            if (!currentRound.targetPlayers.includes(data.user)) {
+                // Spieler ist nicht im Stechen dabei -> Ignorieren
+                return;
+            }
+        }
+
+        if (!p.hasAnswered && !currentRound.revealed) {
             p.answer = data.answer;
             p.hasAnswered = true;
             saveGame();
