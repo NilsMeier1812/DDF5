@@ -12,8 +12,11 @@
         
         #main-ui { display: none; width: 100%; height: 100%; }
         
-        .sidebar { width: 300px; background: #fff; border-right: 1px solid #ddd; display: flex; flex-direction: column; overflow-y: auto; }
-        .sidebar-header { padding: 20px; background: #2c3e50; color: white; font-weight: bold; }
+        .sidebar { width: 300px; background: #fff; border-right: 1px solid #ddd; display: flex; flex-direction: column; position: relative; }
+        .sidebar-header { padding: 20px; background: #2c3e50; color: white; font-weight: bold; flex-shrink: 0; }
+        .sidebar-content { flex: 1; overflow-y: auto; }
+        .sidebar-footer { padding: 10px; border-top: 1px solid #eee; text-align: center; background: #f9f9f9; }
+
         .player-row { padding: 15px 20px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
         .player-name { font-weight: bold; }
         .player-code { font-size: 0.8rem; color: #7f8c8d; background: #eee; padding: 2px 5px; border-radius: 4px; }
@@ -26,17 +29,21 @@
         
         .btn-new-q { background: #3498db; color: white; padding: 12px 25px; border: none; border-radius: 5px; font-size: 1.1rem; cursor: pointer; font-weight: bold; }
         
-        /* PHASEN BUTTONS */
         .btn-close-vote { background: #e67e22; color: white; padding: 12px 25px; border: none; border-radius: 5px; font-size: 1.1rem; cursor: pointer; font-weight: bold; margin-right: 10px; }
-        .btn-close-vote:hover { background: #d35400; }
-        
         .btn-reveal { background: #f1c40f; color: #222; padding: 12px 25px; border: none; border-radius: 5px; font-size: 1.1rem; cursor: pointer; font-weight: bold; margin-right: 10px;}
-        .btn-reveal:hover { background: #f39c12; }
 
         .current-question { background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; border-left: 5px solid #3498db; display: flex; justify-content: space-between; align-items: center;}
         .answers-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 15px; }
         .answer-card { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); border: 1px solid #eee; overflow-wrap: break-word;}
         
+        /* TOAST NOTIFICATION */
+        #notification-area { position: fixed; bottom: 20px; right: 20px; width: 300px; z-index: 3000; display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
+        .toast { background: #333; color: white; padding: 15px; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); animation: slideIn 0.3s; pointer-events: all; border-left: 5px solid #2ecc71; display: flex; justify-content: space-between; align-items: center;}
+        .toast strong { font-size: 1.2rem; display: block; margin-bottom: 5px; }
+        .toast-code { font-family: monospace; font-size: 1.5rem; background: rgba(255,255,255,0.1); padding: 2px 8px; border-radius: 4px; color: #2ecc71; }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+        /* MODAL */
         dialog { border: none; border-radius: 8px; padding: 0; box-shadow: 0 10px 40px rgba(0,0,0,0.3); width: 700px; max-width: 95%; }
         dialog::backdrop { background: rgba(0,0,0,0.5); }
         .modal-header { background: #f8f9fa; padding: 15px 20px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
@@ -44,7 +51,6 @@
         .modal-footer { padding: 15px 20px; border-top: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;}
         
         input, select { padding: 10px; width: 100%; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
-        
         .dynamic-row { display: flex; gap: 10px; margin-bottom: 5px; }
         .dynamic-row input { flex: 1; }
         .btn-add-opt { background: #eee; border: 1px solid #ccc; padding: 5px 10px; cursor: pointer; width: 100%; border-radius: 4px; margin-top: 5px;}
@@ -58,7 +64,6 @@
         #stechen-area { border: 1px solid #ddd; padding: 10px; border-radius: 4px; margin-top: 10px; display: none; background: #fafafa; }
         .player-check-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 5px; margin-top: 5px; }
         .p-check-label { display: flex; align-items: center; gap: 5px; font-size: 0.9rem; cursor: pointer; background: white; padding: 5px; border: 1px solid #eee; border-radius: 4px; }
-        .p-check-label input { width: auto; margin: 0; }
         
         .btn-danger-all { background: #e74c3c; color: white; border: none; padding: 5px 10px; border-radius: 4px; font-size: 0.8rem; cursor: pointer; }
     </style>
@@ -74,20 +79,25 @@
         </div>
     </div>
 
+    <!-- NOTIFICATION AREA -->
+    <div id="notification-area"></div>
+
     <div id="main-ui">
         <div class="sidebar">
             <div class="sidebar-header" style="display:flex; justify-content:space-between; align-items:center;">
                 Teilnehmer
-                <button class="btn-danger-all" onclick="resetAll()">🔥 NEUES SPIEL</button>
+                <button class="btn-danger-all" onclick="resetAll()">🔥 RESET</button>
             </div>
-            <div id="sidebar-list"></div>
+            <div id="sidebar-list" class="sidebar-content"></div>
+            <div class="sidebar-footer">
+                <button class="btn-mini" onclick="manualAddPlayer()" style="width:100%; padding:8px;">+ Manueller Spieler (Code)</button>
+            </div>
         </div>
 
         <div class="content">
             <div class="top-bar">
                 <h1>Gamemaster <span id="game-id-display" style="font-size:0.8rem; color:#aaa; font-weight:normal;"></span></h1>
                 <div>
-                    <!-- BUTTONS WECHSELN JE NACH STATUS -->
                     <button id="btn-close-vote" class="btn-close-vote" onclick="closeVote()">🔒 Voting Schließen</button>
                     <button id="btn-reveal" class="btn-reveal" onclick="reveal()">👁️ Auflösen</button>
                     <button class="btn-new-q" onclick="openModal()">+ Nächste Frage</button>
@@ -160,6 +170,32 @@
             document.getElementById('login-overlay').style.display = 'none';
             document.getElementById('main-ui').style.display = 'flex';
         });
+
+        // --- NEW PLAYER NOTIFICATION ---
+        socket.on('gm_player_joined', (data) => {
+            const container = document.getElementById('notification-area');
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.innerHTML = `
+                <div>
+                    <strong>Neuer Spieler: ${data.name}</strong>
+                    <small>${data.isManual ? 'Manuell erstellt' : 'Beigetreten'}</small>
+                </div>
+                <div class="toast-code">${data.code}</div>
+            `;
+            container.appendChild(toast);
+            
+            // Auto remove nach 10 Sekunden
+            setTimeout(() => { 
+                toast.style.opacity = '0';
+                setTimeout(() => toast.remove(), 300);
+            }, 10000);
+        });
+
+        function manualAddPlayer() {
+            const name = prompt("Name des Spielers eingeben:");
+            if(name) socket.emit('gm_create_player', name);
+        }
 
         const modal = document.getElementById('q-modal');
         function openModal() { 
@@ -281,13 +317,8 @@
         }
 
         // --- PHASE STEUERUNG ---
-        function closeVote() {
-            socket.emit('gm_close_answering');
-        }
-
-        function reveal() { 
-            socket.emit('gm_reveal'); 
-        }
+        function closeVote() { socket.emit('gm_close_answering'); }
+        function reveal() { socket.emit('gm_reveal'); }
         
         function resetAll() {
             if(confirm("🚨 ACHTUNG: Das startet ein komplett NEUES Spiel!\nWirklich machen?")) {
@@ -332,15 +363,12 @@
                 btnClose.style.display = 'none';
                 btnReveal.style.display = 'none';
             } else if (round.answeringOpen) {
-                // Phase 1: Voting ist offen -> Knopf zum Schließen zeigen
                 btnClose.style.display = 'inline-block';
                 btnReveal.style.display = 'none';
             } else if (!round.revealed) {
-                // Phase 2: Voting zu, aber noch verdeckt -> Knopf zum Aufdecken zeigen
                 btnClose.style.display = 'none';
                 btnReveal.style.display = 'inline-block';
             } else {
-                // Phase 3: Aufgedeckt -> Keine Buttons mehr (nur neue Frage)
                 btnClose.style.display = 'none';
                 btnReveal.style.display = 'none';
             }
