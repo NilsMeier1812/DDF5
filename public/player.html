@@ -2,125 +2,228 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Voting Pad</title>
     <style>
-        /* Mobile First Design */
-        body { font-family: sans-serif; margin: 0; padding: 20px; text-align: center; background: #222; color: white; display: flex; flex-direction: column; height: 100vh; box-sizing: border-box; }
+        /* BASE & LAYOUT */
+        body { font-family: 'Segoe UI', sans-serif; margin: 0; padding: 0; background: #222; color: white; display: flex; height: 100vh; overflow: hidden; }
         
-        #header { margin-bottom: 20px; }
-        h1 { margin: 0; font-size: 1.5rem; }
-        #status { color: #aaa; margin-top: 5px; font-style: italic; }
+        /* SIDEBAR (Links) */
+        .sidebar { width: 140px; background: #333; border-right: 1px solid #444; display: flex; flex-direction: column; overflow-y: auto; flex-shrink: 0;}
+        .sidebar h3 { font-size: 0.9rem; padding: 15px; margin: 0; background: #444; text-align: center; color: #aaa; text-transform: uppercase; letter-spacing: 1px;}
+        .p-list { list-style: none; padding: 0; margin: 0; }
+        .p-item { padding: 10px; border-bottom: 1px solid #444; font-size: 0.9rem; display: flex; justify-content: space-between; align-items: center; }
+        .p-name { font-weight: bold; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 80px;}
+        .p-status { display: flex; align-items: center; gap: 4px; }
+        .answered-icon { width: 8px; height: 8px; background: #2ecc71; border-radius: 50%; display: none; }
+        .answered-icon.visible { display: block; }
 
-        /* Login Overlay */
-        #login-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #111; z-index: 1000; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box;}
-        .login-box h2 { color: white; margin-bottom: 20px; }
-        .code-input { font-size: 2rem; padding: 10px; text-align: center; width: 150px; letter-spacing: 5px; border-radius: 10px; border: none; margin-bottom: 20px;}
-        .btn-enter { padding: 15px 30px; font-size: 1.2rem; background: #2ecc71; color: white; border: none; border-radius: 10px; width: 100%; cursor: pointer;}
-
-        /* Das Grid für die 4 Buttons */
-        .grid { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 15px; flex-grow: 1; opacity: 0.1; /* Ausgegraut bis Login */ pointer-events: none; transition: opacity 0.5s; }
-        .grid.active { opacity: 1; pointer-events: all; }
+        /* MAIN AREA (Rechts) */
+        .main-area { flex: 1; display: flex; flex-direction: column; padding: 20px; position: relative; }
         
-        button { border: none; border-radius: 15px; font-size: 3rem; font-weight: bold; color: white; cursor: pointer; transition: transform 0.1s; box-shadow: 0 4px 0 rgba(0,0,0,0.3); }
-        button:active { transform: translateY(4px); box-shadow: none; }
-        button:disabled { opacity: 0.2; cursor: not-allowed; transform: none; box-shadow: none; filter: grayscale(100%); }
+        /* LOGIN */
+        #login-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #111; z-index: 2000; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+        .code-input { font-size: 2rem; padding: 10px; text-align: center; width: 120px; border-radius: 10px; border: none; margin-bottom: 20px; letter-spacing: 5px;}
+        
+        /* QUESTION HEADER */
+        .q-header { margin-bottom: 20px; text-align: center; }
+        .q-text { font-size: 1.2rem; background: rgba(255,255,255,0.1); padding: 15px; border-radius: 10px; display: inline-block; min-width: 50%; }
 
-        .btn-a { background-color: #e74c3c; }
-        .btn-b { background-color: #f1c40f; color: #333; }
-        .btn-c { background-color: #2ecc71; }
-        .btn-d { background-color: #3498db; }
+        /* INPUT MODES */
+        .mode-container { display: none; height: 100%; flex-direction: column; }
+        .mode-container.active { display: flex; }
 
-        .selected { border: 5px solid white; box-shadow: 0 0 20px white; }
+        /* 1. MC BUTTONS */
+        .mc-grid { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 10px; flex: 1; margin-bottom: 20px; }
+        .btn-mc { border: none; border-radius: 15px; font-size: 2.5rem; font-weight: bold; color: white; cursor: pointer; transition: transform 0.1s; }
+        .btn-mc:active { transform: scale(0.95); }
+        .btn-a { background: #e74c3c; } .btn-b { background: #f1c40f; color: #222; } .btn-c { background: #2ecc71; } .btn-d { background: #3498db; }
+        
+        /* 2. TEXT INPUT */
+        .text-input-wrapper { display: flex; flex-direction: column; gap: 15px; margin-top: 20px; }
+        textarea { width: 100%; height: 100px; padding: 15px; font-size: 1.2rem; border-radius: 10px; border: none; font-family: sans-serif; resize: none; box-sizing: border-box;}
+        .btn-submit { background: #3498db; color: white; padding: 20px; font-size: 1.5rem; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; }
+        
+        /* 3. PLAYER VOTE LIST */
+        .vote-list { display: flex; flex-direction: column; gap: 10px; overflow-y: auto; }
+        .btn-vote-player { background: #444; color: white; padding: 15px; border: 1px solid #555; border-radius: 8px; font-size: 1.2rem; cursor: pointer; text-align: left; }
+        .btn-vote-player:active { background: #666; }
+
+        /* GLOBAL STATES */
+        .disabled-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 100; display: none; justify-content: center; align-items: center; flex-direction: column; }
+        .disabled-overlay.visible { display: flex; }
+        .checkmark { font-size: 4rem; margin-bottom: 10px; }
+
     </style>
 </head>
 <body>
 
-    <!-- LOGIN OVERLAY -->
+    <!-- LOGIN -->
     <div id="login-overlay">
-        <div class="login-box">
-            <h2>🔑 Code eingeben</h2>
-            <p style="color:#aaa; margin-bottom:20px;" id="login-msg">Bitte den 4-stelligen Code vom Spielleiter eingeben.</p>
-            <input type="tel" maxlength="4" class="code-input" id="player-code" placeholder="0000">
-            <button class="btn-enter" onclick="submitLogin()">Beitreten</button>
+        <h2>Willkommen <span id="welcome-name"></span></h2>
+        <p style="color:#aaa;">Code eingeben:</p>
+        <input type="tel" maxlength="4" class="code-input" id="player-code" placeholder="----">
+        <button class="btn-submit" style="width:auto; padding: 10px 30px;" onclick="submitLogin()">GO</button>
+        <p id="login-msg" style="color: #e74c3c; margin-top: 10px;"></p>
+    </div>
+
+    <!-- SIDEBAR -->
+    <div class="sidebar">
+        <h3>Leben</h3>
+        <ul class="p-list" id="sidebar-list">
+            <!-- Dynamisch -->
+        </ul>
+    </div>
+
+    <!-- GAME AREA -->
+    <div class="main-area">
+        
+        <!-- FRAGE HEADER -->
+        <div class="q-header">
+            <div class="q-text" id="display-question">Warte auf Gamemaster...</div>
         </div>
-    </div>
 
-    <div id="header">
-        <h1 id="username">Lade...</h1>
-        <div id="status">Warte auf Rundenstart...</div>
-    </div>
+        <!-- WAITING / DONE OVERLAY -->
+        <div id="wait-screen" class="disabled-overlay">
+            <div class="checkmark">✅</div>
+            <h3>Antwort gesendet!</h3>
+        </div>
 
-    <div class="grid" id="voting-grid">
-        <button class="btn-a" id="btn-A" onclick="vote('A')">A</button>
-        <button class="btn-b" id="btn-B" onclick="vote('B')">B</button>
-        <button class="btn-c" id="btn-C" onclick="vote('C')">C</button>
-        <button class="btn-d" id="btn-D" onclick="vote('D')">D</button>
+        <!-- MODUS: MC -->
+        <div id="mode-mc" class="mode-container">
+            <div class="mc-grid">
+                <button class="btn-mc btn-a" onclick="sendAnswer('A')">A</button>
+                <button class="btn-mc btn-b" onclick="sendAnswer('B')">B</button>
+                <button class="btn-mc btn-c" onclick="sendAnswer('C')">C</button>
+                <button class="btn-mc btn-d" onclick="sendAnswer('D')">D</button>
+            </div>
+        </div>
+
+        <!-- MODUS: TEXT -->
+        <div id="mode-text" class="mode-container">
+            <div class="text-input-wrapper">
+                <textarea id="text-answer" placeholder="Deine Antwort eingeben..."></textarea>
+                <button class="btn-submit" onclick="sendText()">Absenden</button>
+            </div>
+        </div>
+
+        <!-- MODUS: VOTE PLAYER -->
+        <div id="mode-vote" class="mode-container">
+            <p style="text-align:center; color:#e74c3c;">Wähle einen Spieler:</p>
+            <div class="vote-list" id="vote-player-list">
+                <!-- Buttons für jeden Spieler -->
+            </div>
+        </div>
+
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io();
-
-        // Name aus URL holen
-        const pathParts = window.location.pathname.split('/');
-        let rawName = pathParts[pathParts.length - 1];
+        const rawName = window.location.pathname.split('/').pop();
         const username = decodeURIComponent(rawName);
+        document.getElementById('welcome-name').innerText = username;
 
-        document.getElementById('username').innerText = username;
+        // --- INIT ---
+        socket.on('connect', () => { socket.emit('player_announce', username); });
 
-        // LOGIN LOGIK
         function submitLogin() {
             const code = document.getElementById('player-code').value;
             socket.emit('player_login', { name: username, code: code });
         }
-
+        
         socket.on('player_login_success', () => {
-            // Overlay ausblenden
             document.getElementById('login-overlay').style.display = 'none';
-            // Grid aktivieren
-            document.getElementById('voting-grid').classList.add('active');
         });
 
         socket.on('player_login_fail', () => {
-            const msg = document.getElementById('login-msg');
-            msg.innerText = "Falscher Code! Frag den Gamemaster.";
-            msg.style.color = "#e74c3c";
-            document.getElementById('player-code').value = '';
+            document.getElementById('login-msg').innerText = "Falscher Code!";
         });
 
-        // VOTING LOGIK
-        function vote(choice) {
-            socket.emit('vote', { user: username, choice: choice });
-            resetButtons();
-            document.getElementById('btn-' + choice).classList.add('selected');
-        }
+        // --- GAME UPDATE ---
+        socket.on('update_game_state', (data) => {
+            // 1. Sidebar rendern
+            renderSidebar(data.players);
 
-        function resetButtons() {
-            ['A', 'B', 'C', 'D'].forEach(letter => {
-                document.getElementById('btn-' + letter).classList.remove('selected');
-            });
-        }
+            // 2. Modus und Frage setzen
+            const round = data.round;
+            const me = data.players[username];
 
-        // EVENTS
-        socket.on('voting_status', (isOpen) => {
-            const statusDiv = document.getElementById('status');
-            const buttons = document.querySelectorAll('button');
-            
-            if (isOpen) {
-                statusDiv.innerText = "Abstimmung läuft! Tippe jetzt.";
-                statusDiv.style.color = "#2ecc71";
-                buttons.forEach(b => b.disabled = false);
-                resetButtons();
+            // Bin ich schon fertig mit Antworten?
+            if (me && me.hasAnswered) {
+                showWaitScreen(true);
             } else {
-                statusDiv.innerText = "Abstimmung geschlossen.";
-                statusDiv.style.color = "#e74c3c";
-                buttons.forEach(b => b.disabled = true);
+                showWaitScreen(false);
+                switchMode(round.type, round.question, data.players);
             }
         });
 
-        socket.on('vote_confirmed', (choice) => {
-            document.getElementById('status').innerText = `Gewählt: ${choice}`;
+        function renderSidebar(players) {
+            const list = document.getElementById('sidebar-list');
+            list.innerHTML = '';
+            for (const [name, p] of Object.entries(players)) {
+                if(!p.connected) continue; // Nur verbundene Spieler anzeigen
+                const li = document.createElement('li');
+                li.className = 'p-item';
+                li.innerHTML = `
+                    <div class="p-name">${name}</div>
+                    <div class="p-status">
+                        <span class="answered-icon ${p.hasAnswered ? 'visible' : ''}"></span>
+                        <span style="color:#e74c3c">❤️</span> ${p.lives}
+                    </div>
+                `;
+                list.appendChild(li);
+            }
+        }
+
+        function switchMode(type, questionText, allPlayers) {
+            // Alle ausblenden
+            document.querySelectorAll('.mode-container').forEach(el => el.classList.remove('active'));
+            document.getElementById('display-question').innerText = questionText || "Pause";
+
+            if (type === 'MC') {
+                document.getElementById('mode-mc').classList.add('active');
+            } else if (type === 'TEXT') {
+                document.getElementById('mode-text').classList.add('active');
+                document.getElementById('text-answer').value = ''; // Reset
+            } else if (type === 'PLAYER_VOTE') {
+                document.getElementById('mode-vote').classList.add('active');
+                renderPlayerButtons(allPlayers);
+            }
+        }
+
+        function renderPlayerButtons(players) {
+            const container = document.getElementById('vote-player-list');
+            container.innerHTML = '';
+            for (const name in players) {
+                if(name === username) continue; // Man kann sich nicht selbst wählen (optional)
+                
+                const btn = document.createElement('button');
+                btn.className = 'btn-vote-player';
+                btn.innerText = name;
+                btn.onclick = () => sendAnswer(name);
+                container.appendChild(btn);
+            }
+        }
+
+        function showWaitScreen(visible) {
+            const el = document.getElementById('wait-screen');
+            if(visible) el.classList.add('visible');
+            else el.classList.remove('visible');
+        }
+
+        // --- ACTIONS ---
+        function sendAnswer(val) {
+            socket.emit('submit_answer', { user: username, answer: val });
+        }
+
+        function sendText() {
+            const txt = document.getElementById('text-answer').value;
+            if(txt.trim()) sendAnswer(txt);
+        }
+
+        socket.on('answer_confirmed', () => {
+            showWaitScreen(true);
         });
 
     </script>
