@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Voting Pad</title>
+    <style>
+        /* Mobile First Design */
+        body { font-family: sans-serif; margin: 0; padding: 20px; text-align: center; background: #222; color: white; display: flex; flex-direction: column; height: 100vh; box-sizing: border-box; }
+        
+        #header { margin-bottom: 20px; }
+        h1 { margin: 0; font-size: 1.5rem; }
+        #status { color: #aaa; margin-top: 5px; font-style: italic; }
+
+        /* Das Grid für die 4 Buttons */
+        .grid { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 15px; flex-grow: 1; }
+        
+        button { border: none; border-radius: 15px; font-size: 3rem; font-weight: bold; color: white; cursor: pointer; transition: transform 0.1s; box-shadow: 0 4px 0 rgba(0,0,0,0.3); }
+        button:active { transform: translateY(4px); box-shadow: none; }
+        button:disabled { opacity: 0.2; cursor: not-allowed; transform: none; box-shadow: none; filter: grayscale(100%); }
+
+        .btn-a { background-color: #e74c3c; }
+        .btn-b { background-color: #f1c40f; color: #333; }
+        .btn-c { background-color: #2ecc71; }
+        .btn-d { background-color: #3498db; }
+
+        /* Wenn gevotet wurde */
+        .selected { border: 5px solid white; box-shadow: 0 0 20px white; }
+    </style>
+</head>
+<body>
+
+    <div id="header">
+        <h1 id="username">Lade...</h1>
+        <div id="status">Warte auf Rundenstart...</div>
+    </div>
+
+    <div class="grid">
+        <button class="btn-a" id="btn-A" onclick="vote('A')">A</button>
+        <button class="btn-b" id="btn-B" onclick="vote('B')">B</button>
+        <button class="btn-c" id="btn-C" onclick="vote('C')">C</button>
+        <button class="btn-d" id="btn-D" onclick="vote('D')">D</button>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+
+        // Name aus URL holen (/p/Max -> Max)
+        // Wir dekodieren URI Komponenten falls jemand Leerzeichen nutzt
+        const pathParts = window.location.pathname.split('/');
+        let rawName = pathParts[pathParts.length - 1];
+        const username = decodeURIComponent(rawName);
+
+        document.getElementById('username').innerText = username;
+
+        function vote(choice) {
+            // Vote senden
+            socket.emit('vote', { user: username, choice: choice });
+            
+            // Visuelles Feedback (Buttons kurz deaktivieren oder markieren)
+            resetButtons();
+            document.getElementById('btn-' + choice).classList.add('selected');
+        }
+
+        function resetButtons() {
+            ['A', 'B', 'C', 'D'].forEach(letter => {
+                document.getElementById('btn-' + letter).classList.remove('selected');
+            });
+        }
+
+        // --- EVENTS VOM SERVER ---
+
+        // 1. Darf ich voten?
+        socket.on('voting_status', (isOpen) => {
+            const statusDiv = document.getElementById('status');
+            const buttons = document.querySelectorAll('button');
+            
+            if (isOpen) {
+                statusDiv.innerText = "Abstimmung läuft! Tippe jetzt.";
+                statusDiv.style.color = "#2ecc71";
+                buttons.forEach(b => b.disabled = false);
+                resetButtons(); // Auswahl bei neuer Runde resetten
+            } else {
+                statusDiv.innerText = "Abstimmung geschlossen.";
+                statusDiv.style.color = "#e74c3c";
+                buttons.forEach(b => b.disabled = true);
+            }
+        });
+
+        // 2. Bestätigung vom Server
+        socket.on('vote_confirmed', (choice) => {
+            document.getElementById('status').innerText = `Gewählt: ${choice}`;
+        });
+
+    </script>
+</body>
+</html>
