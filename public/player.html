@@ -7,25 +7,31 @@
     <style>
         body { font-family: 'Segoe UI', sans-serif; margin: 0; padding: 0; background: #222; color: white; display: flex; height: 100vh; overflow: hidden; }
         
+        /* SIDEBAR */
         .sidebar { width: 140px; background: #333; border-right: 1px solid #444; display: flex; flex-direction: column; overflow-y: auto; flex-shrink: 0;}
         .sidebar h3 { font-size: 0.9rem; padding: 15px; margin: 0; background: #444; text-align: center; color: #aaa; text-transform: uppercase; letter-spacing: 1px;}
         .p-item { padding: 10px; border-bottom: 1px solid #444; font-size: 0.9rem; display: flex; justify-content: space-between; align-items: center; }
         .p-name { font-weight: bold; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 80px;}
         .answered-icon { width: 8px; height: 8px; background: #2ecc71; border-radius: 50%; display: none; }
         .answered-icon.visible { display: block; }
-
+        
+        /* MAIN AREA */
         .main-area { flex: 1; display: flex; flex-direction: column; padding: 20px; position: relative; }
         
+        /* LOGIN */
         #login-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #111; z-index: 2000; display: flex; flex-direction: column; justify-content: center; align-items: center; }
         .code-input { font-size: 2rem; padding: 10px; text-align: center; width: 120px; border-radius: 10px; border: none; margin-bottom: 20px; letter-spacing: 5px;}
         
+        /* HEADER */
         .q-header { margin-bottom: 20px; text-align: center; }
+        .round-indicator { color: #888; font-size: 0.9rem; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 2px; }
         .q-text { font-size: 1.2rem; background: rgba(255,255,255,0.1); padding: 15px; border-radius: 10px; display: inline-block; min-width: 50%; }
 
+        /* MODES */
         .mode-container { display: none; height: 100%; flex-direction: column; }
         .mode-container.active { display: flex; }
 
-        /* MC & TEXT Styles */
+        /* INPUTS */
         .mc-grid { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 10px; flex: 1; margin-bottom: 20px; }
         .btn-mc { border: none; border-radius: 15px; font-size: 2.5rem; font-weight: bold; color: white; cursor: pointer; transition: transform 0.1s; }
         .btn-mc:active { transform: scale(0.95); }
@@ -35,16 +41,20 @@
         textarea { width: 100%; height: 100px; padding: 15px; font-size: 1.2rem; border-radius: 10px; border: none; font-family: sans-serif; resize: none; box-sizing: border-box;}
         .btn-submit { background: #3498db; color: white; padding: 20px; font-size: 1.5rem; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; }
         
-        /* NEU: VOTING KARTEN STYLE */
+        /* RESULTS (REVEAL) */
+        .results-list { overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+        .result-card { background: #444; padding: 15px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center;}
+        .res-name { font-weight: bold; color: #aaa; font-size: 0.9rem;}
+        .res-val { font-size: 1.2rem; font-weight: bold; color: white; }
+
+        /* VOTING & HISTORY */
         .vote-list { display: flex; flex-direction: column; gap: 10px; overflow-y: auto; padding-bottom: 20px;}
         .vote-card { background: #333; border-radius: 8px; overflow: hidden; border: 1px solid #444; }
         .vote-card-header { display: flex; justify-content: space-between; align-items: stretch; height: 50px; }
         .vote-name { flex: 1; display: flex; align-items: center; padding-left: 15px; font-weight: bold; font-size: 1.1rem; }
-        
-        .btn-inspect { background: #444; border: none; border-left: 1px solid #555; color: #aaa; padding: 0 15px; cursor: pointer; }
+        .btn-inspect { background: #444; border: none; border-left: 1px solid #555; color: #aaa; padding: 0 15px; cursor: pointer; font-size: 0.9rem;}
         .btn-vote-action { background: #e74c3c; border: none; color: white; padding: 0 20px; font-weight: bold; cursor: pointer; }
-        .btn-vote-action:active { background: #c0392b; }
-
+        
         .vote-history { background: #222; padding: 10px; display: none; border-top: 1px solid #444; }
         .vote-history.show { display: block; }
         .history-item { margin-bottom: 8px; font-size: 0.9rem; border-bottom: 1px solid #333; padding-bottom: 5px; }
@@ -58,6 +68,7 @@
 </head>
 <body>
 
+    <!-- LOGIN -->
     <div id="login-overlay">
         <h2>Hallo <span id="welcome-name"></span></h2>
         <input type="tel" maxlength="4" class="code-input" id="player-code" placeholder="----">
@@ -65,19 +76,31 @@
         <p id="login-msg" style="color: #e74c3c; margin-top: 10px;"></p>
     </div>
 
+    <!-- SIDEBAR -->
     <div class="sidebar">
         <h3>Leben</h3>
         <ul class="p-list" id="sidebar-list"></ul>
     </div>
 
+    <!-- MAIN -->
     <div class="main-area">
-        <div class="q-header"><div class="q-text" id="display-question">...</div></div>
+        <div class="q-header">
+            <div class="round-indicator" id="round-display">Runde 1</div>
+            <div class="q-text" id="display-question">Warte...</div>
+        </div>
 
         <div id="wait-screen" class="disabled-overlay">
             <div class="checkmark">✅</div>
             <h3>Gesendet!</h3>
         </div>
 
+        <!-- MODE: RESULTS (Wenn GM aufdeckt) -->
+        <div id="mode-results" class="mode-container">
+            <h3 style="text-align:center; margin-top:0; color:#f39c12;">Auflösung:</h3>
+            <div class="results-list" id="results-container"></div>
+        </div>
+
+        <!-- MODE: MC -->
         <div id="mode-mc" class="mode-container">
             <div class="mc-grid">
                 <button class="btn-mc btn-a" onclick="sendAnswer('A')">A</button>
@@ -87,6 +110,7 @@
             </div>
         </div>
 
+        <!-- MODE: TEXT -->
         <div id="mode-text" class="mode-container">
             <div class="text-input-wrapper">
                 <textarea id="text-answer" placeholder="Antwort..."></textarea>
@@ -94,7 +118,7 @@
             </div>
         </div>
 
-        <!-- NEUER VOTING BEREICH -->
+        <!-- MODE: VOTING (Wer verliert Leben?) -->
         <div id="mode-vote" class="mode-container">
             <p style="text-align:center; color:#aaa; margin-top:0;">Verlauf prüfen & jemanden wählen:</p>
             <div class="vote-list" id="vote-player-list"></div>
@@ -120,29 +144,42 @@
         socket.on('player_login_success', () => document.getElementById('login-overlay').style.display = 'none');
         socket.on('player_login_fail', () => document.getElementById('login-msg').innerText = "Falscher Code!");
 
+        // --- HAUPT UPDATE LOOP ---
         socket.on('update_game_state', (data) => {
             renderSidebar(data.players);
             
-            // History speichern für Anzeige
+            // History speichern (wichtig für die "Einzelnen Runden" Anzeige im Voting)
             currentHistory = data.history || [];
+            
+            // Runde anzeigen (Anzahl der archivierten Fragen + 1)
+            const roundNum = currentHistory.length + 1;
+            document.getElementById('round-display').innerText = `Runde ${roundNum}`;
 
             const round = data.round;
             const me = data.players[username];
 
-            if (me && me.hasAnswered) {
-                showWaitScreen(true);
-                return;
-            } else {
+            // 1. Priorität: Aufgedeckte Ergebnisse (Reveal)
+            if (round.revealed) {
                 showWaitScreen(false);
+                switchMode('RESULTS', round.question, data.players);
+                return;
             }
 
-            const currentSignature = round.type + "::" + round.question;
-            if (currentSignature !== lastRoundSignature) {
-                lastRoundSignature = currentSignature;
-                switchMode(round.type, round.question, data.players);
+            // 2. Priorität: Habe ich schon geantwortet?
+            if (me && me.hasAnswered) {
+                showWaitScreen(true);
             } else {
-                // Update Vote List auch wenn Runde gleich bleibt (z.B. neue Spieler)
-                if (round.type === 'PLAYER_VOTE') renderPlayerCards(data.players);
+                showWaitScreen(false);
+                
+                // Check ob neue Frage, um Inputs zu resetten
+                const currentSignature = round.type + "::" + round.question;
+                if (currentSignature !== lastRoundSignature) {
+                    lastRoundSignature = currentSignature;
+                    switchMode(round.type, round.question, data.players);
+                } else {
+                     // Live-Update der Player-Liste im Vote Modus
+                     if (round.type === 'PLAYER_VOTE') renderPlayerCards(data.players);
+                }
             }
         });
 
@@ -167,8 +204,12 @@
             document.querySelectorAll('.mode-container').forEach(el => el.classList.remove('active'));
             document.getElementById('display-question').innerText = questionText || "Pause";
 
-            if (type === 'MC') document.getElementById('mode-mc').classList.add('active');
-            else if (type === 'TEXT') {
+            if (type === 'RESULTS') {
+                document.getElementById('mode-results').classList.add('active');
+                renderResults(allPlayers);
+            } else if (type === 'MC') {
+                document.getElementById('mode-mc').classList.add('active');
+            } else if (type === 'TEXT') {
                 document.getElementById('mode-text').classList.add('active');
                 document.getElementById('text-answer').value = ''; 
             } else if (type === 'PLAYER_VOTE') {
@@ -177,15 +218,30 @@
             }
         }
 
+        function renderResults(players) {
+            const container = document.getElementById('results-container');
+            container.innerHTML = '';
+            for (const [name, p] of Object.entries(players)) {
+                if (p.answer) {
+                    const card = document.createElement('div');
+                    card.className = 'result-card';
+                    card.innerHTML = `
+                        <div class="res-name">${name}</div>
+                        <div class="res-val">${p.answer}</div>
+                    `;
+                    container.appendChild(card);
+                }
+            }
+        }
+
         function renderPlayerCards(players) {
             const container = document.getElementById('vote-player-list');
-            // Einfacher Re-Render, bei vielen Spielern könnte man das optimieren
             container.innerHTML = ''; 
 
             for (const name in players) {
                 if(name === username) continue; // Sich selbst nicht wählen
                 
-                // History HTML bauen
+                // Hier bauen wir die HISTORY (einzelne Runden)
                 let historyHTML = '';
                 if (currentHistory.length === 0) {
                     historyHTML = '<div class="history-item" style="color:#666">Keine Antworten in dieser Runde.</div>';
@@ -199,7 +255,6 @@
                             </div>`;
                     });
                 }
-
                 const card = document.createElement('div');
                 card.className = 'vote-card';
                 card.innerHTML = `
@@ -208,15 +263,12 @@
                         <button class="btn-inspect" onclick="toggleHistory(this)">👁️ Antworten</button>
                         <button class="btn-vote-action" onclick="sendAnswer('${name}')">VOTE</button>
                     </div>
-                    <div class="vote-history">
-                        ${historyHTML}
-                    </div>
+                    <div class="vote-history">${historyHTML}</div>
                 `;
                 container.appendChild(card);
             }
         }
 
-        // Globale Funktion für onclick im HTML
         window.toggleHistory = function(btn) {
             const historyDiv = btn.parentElement.nextElementSibling;
             if (historyDiv.classList.contains('show')) {
@@ -241,7 +293,6 @@
             const txt = document.getElementById('text-answer').value;
             if(txt.trim()) sendAnswer(txt);
         }
-
         socket.on('answer_confirmed', () => showWaitScreen(true));
     </script>
 </body>
