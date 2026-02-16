@@ -5,25 +5,17 @@ const path = require('path');
 const admin = require('firebase-admin');
 
 // --- FIREBASE SETUP ---
-// Wir versuchen, die Credentials aus der Environment Variable zu lesen (für Render)
-// Falls das lokal nicht existiert, stürzt der Server ab -> Anleitung unten beachten!
 let serviceAccount;
 try {
     if (process.env.FIREBASE_CREDENTIALS) {
         serviceAccount = JSON.parse(process.env.FIREBASE_CREDENTIALS);
     } else {
-        // Fallback für lokale Entwicklung (optional, falls du eine Datei hast)
         serviceAccount = require('./service-account-key.json');
     }
-
-    admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount)
-    });
+    admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
     console.log("🔥 Firebase erfolgreich initialisiert!");
 } catch (error) {
-    console.error("❌ FEHLER: Firebase konnte nicht gestartet werden.");
-    console.error("Hast du die Environment Variable FIREBASE_CREDENTIALS gesetzt?");
-    console.error(error.message);
+    console.error("❌ FEHLER: Firebase Credentials fehlen.");
 }
 
 const db = admin.firestore();
@@ -35,69 +27,56 @@ const io = new Server(server);
 
 const GM_PASSWORD = "admin"; 
 
-// --- STATUS SPEICHER (In-Memory Cache) ---
-// Wir halten die Daten im RAM für Geschwindigkeit, synchronisieren aber alles zur DB
+// --- STATUS ---
 let players = {}; 
-let currentRound = { type: 'WAITING', question: '', options: [] };
+// Neu: 'revealed' Flag
+let currentRound = { type: 'WAITING', question: '', options: [], revealed: false };
 let sessionHistory = [];
 
-// --- DATENBANK FUNKTIONEN ---
-
+// --- DATABASE ---
 async function loadGame() {
     try {
         const doc = await GAME_DOC_REF.get();
         if (doc.exists) {
             const data = doc.data();
             players = data.players || {};
-            currentRound = data.currentRound || { type: 'WAITING', question: '' };
+            currentRound = data.currentRound || { type: 'WAITING', question: '', revealed: false };
             sessionHistory = data.sessionHistory || [];
-            
-            // Connected Status resetten beim Neustart
-            for (let p in players) {
-                players[p].connected = false;
-            }
-            console.log("📥 Spielstand aus Firebase geladen!");
+            for (let p in players) players[p].connected = false;
         } else {
-            console.log("🆕 Kein Spielstand gefunden, starte neu.");
-            saveGame(); // Leeres Dokument anlegen
+            saveGame();
         }
-    } catch (e) {
-        console.error("Fehler beim Laden von Firebase:", e);
-    }
+    } catch (e) { console.error("Load Error:", e); }
 }
 
-// Speichern (Fire & Forget - wir warten nicht auf das Ergebnis, um Lag zu vermeiden)
 function saveGame() {
-    const data = {
-        players: players,
-        currentRound: currentRound,
-        sessionHistory: sessionHistory,
+    GAME_DOC_REF.set({
+        players, currentRound, sessionHistory,
         lastUpdated: admin.firestore.FieldValue.serverTimestamp()
-    };
-    
-    GAME_DOC_REF.set(data).catch(err => {
-        console.error("Fehler beim Speichern in Firebase:", err);
-    });
+    }).catch(e => console.error("Save Error:", e));
 }
-
-// Initial laden
 loadGame();
 
-// --- ROUTING ---
 app.use(express.static('public'));
-app.get('/', (req, res) => res.send('Server Online with Firebase.'));
+app.get('/', (req, res) => res.send('Server Online (Firebase Mode).'));
 app.get('/gm', (req, res) => res.sendFile(path.join(__dirname, 'public', 'gamemaster.html')));
 app.get('/p/:name', (req, res) => res.sendFile(path.join(__dirname, 'public', 'player.html')));
 
 io.on('connection', (socket) => {
     
+    // --- STATUS AN ALLE SENDEN ---
     const broadcastStatus = () => {
         const publicPlayers = {};
         for (const [name, data] of Object.entries(players)) {
+            // WICHTIG: Antwort nur mitschicken, wenn aufgedeckt wurde!
+            // (Oder wenn es der Spieler selbst ist, das handhaben wir aber clientseitig meistens)
+            const answerVisible = currentRound.revealed ? data.answer : null;
+
             publicPlayers[name] = { 
                 lives: data.lives, 
                 hasAnswered: data.hasAnswered,
-                connected: data.connected
+                connected: data.connected,
+                answer: answerVisible // Hier ist das Geheimnis
             };
         }
         
@@ -107,6 +86,7 @@ io.on('connection', (socket) => {
             history: sessionHistory 
         });
 
+        // GM sieht IMMER alles
         io.to('gamemaster_room').emit('gm_update_full', {
             round: currentRound,
             players: players,
@@ -124,10 +104,23 @@ io.on('connection', (socket) => {
         }
     });
 
+    // --- AUFDECKEN ---
+    socket.on('gm_reveal', () => {
+        currentRound.revealed = true;
+        saveGame();
+        broadcastStatus();
+    });
+
+    // --- STARTEN ---
     socket.on('gm_start_round', (data) => {
+        // 1. NEUE SPIELRUNDE (Alles resetten)
         if (data.isNewGameRound) {
-            sessionHistory = [];
-        } else if (currentRound.type !== 'WAITING' && currentRound.type !== 'PLAYER_VOTE') {
+            // Vorher speichern wir den finalen Stand der letzten Runde nochmal explizit
+            saveGame(); 
+            sessionHistory = []; // RAM leeren für neue Runde
+        } 
+        // 2. NÄCHSTE FRAGE (Alte archivieren)
+        else if (currentRound.type !== 'WAITING') {
             const roundAnswers = {};
             for(const [name, p] of Object.entries(players)) {
                 if (p.hasAnswered && p.answer) {
@@ -140,10 +133,12 @@ io.on('connection', (socket) => {
             });
         }
 
+        // Neue Runde init
         currentRound = {
             type: data.type,
             question: data.question,
-            options: []
+            options: [],
+            revealed: false // Reset Reveal
         };
         
         for (let p in players) {
@@ -190,7 +185,8 @@ io.on('connection', (socket) => {
 
     socket.on('submit_answer', (data) => {
         const p = players[data.user];
-        if (p && !p.hasAnswered) {
+        // Antworten nur erlaubt, wenn noch NICHT aufgedeckt wurde
+        if (p && !p.hasAnswered && !currentRound.revealed) {
             p.answer = data.answer;
             p.hasAnswered = true;
             saveGame();
