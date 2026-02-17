@@ -82,9 +82,12 @@
         .q-meta { color: #6b7280; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px; font-weight: bold; margin-bottom: 10px; }
         #q-text { font-size: 1.8rem; font-weight: 700; color: #111; line-height: 1.3; }
         
-        .counter-box { text-align: center; background: #eff6ff; padding: 15px 25px; border-radius: 12px; color: var(--primary); }
-        .counter-num { font-size: 2.5rem; font-weight: 800; display: block; line-height: 1; }
-        .counter-label { font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
+        .stats-col { display: flex; flex-direction: column; gap: 10px; min-width: 140px; }
+        .counter-box { text-align: center; background: #eff6ff; padding: 15px; border-radius: 12px; color: var(--primary); }
+        .counter-num { font-size: 2rem; font-weight: 800; display: block; line-height: 1; }
+        .counter-label { font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
+
+        .timer-box { text-align: center; background: #111827; padding: 10px; border-radius: 12px; color: #22c55e; font-family: monospace; font-size: 1.5rem; letter-spacing: 2px; border: 2px solid #374151; }
 
         /* ANSWERS GRID */
         .answers-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
@@ -183,9 +186,12 @@
                     <div id="gm-image-wrapper" style="margin-top:20px; display:none;"><img id="gm-image-display" src="" style="max-height:250px; border-radius:8px; border:1px solid #e5e7eb;"></div>
                     <div id="gm-audio-wrapper" style="margin-top:15px; display:none; background:#f3f4f6; padding:10px; border-radius:8px;"><audio id="gm-audio-player" controls style="width:100%;"></audio></div>
                 </div>
-                <div class="counter-box">
-                    <span class="counter-num" id="answer-count">0</span>
-                    <span class="counter-label">Antworten</span>
+                <div class="stats-col">
+                    <div class="timer-box" id="timer-display">00:00</div>
+                    <div class="counter-box">
+                        <span class="counter-num" id="answer-count">0</span>
+                        <span class="counter-label">Antworten</span>
+                    </div>
                 </div>
             </div>
 
@@ -276,8 +282,12 @@
     <script>
         const socket = io();
         let currentPlayers = {}; 
-        // Für den Toggle Button
         let isAnsweringOpen = false;
+        
+        // Timer Globals
+        let timerInterval = null;
+        let roundStartTime = null;
+        let roundEndTime = null;
 
         function login() { const pw = document.getElementById('gm-password').value; socket.emit('gm_login', pw); }
         socket.on('gm_login_success', () => { document.getElementById('login-overlay').style.display = 'none'; document.getElementById('main-ui').style.display = 'flex'; });
@@ -378,8 +388,39 @@
 
         socket.on('gm_update_full', (data) => {
             currentPlayers = data.players; document.getElementById('game-id-display').innerText = `(${data.gameId})`;
+            // Update Round Times for Timer
+            roundStartTime = data.round.startTime;
+            roundEndTime = data.round.endTime;
             renderSidebar(data.players); renderMainArea(data.round, data.players);
         });
+
+        // --- TIMER LOGIC ---
+        setInterval(() => {
+            const display = document.getElementById('timer-display');
+            if (!display) return;
+            
+            if (roundStartTime) {
+                let diff = 0;
+                if (roundEndTime) {
+                    // Timer gestoppt
+                    diff = roundEndTime - roundStartTime;
+                    display.style.color = '#ef4444'; // Rot wenn gestoppt
+                } else {
+                    // Timer läuft
+                    diff = Date.now() - roundStartTime;
+                    display.style.color = '#22c55e'; // Grün wenn läuft
+                }
+                
+                if (diff < 0) diff = 0;
+                const seconds = Math.floor((diff / 1000) % 60);
+                const minutes = Math.floor((diff / (1000 * 60)) % 60);
+                display.innerText = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            } else {
+                display.innerText = "00:00";
+                display.style.color = '#6b7280';
+            }
+        }, 100);
+
         function renderSidebar(players) {
             const list = document.getElementById('sidebar-list'); list.innerHTML = '';
             const active = []; const pending = []; for (const [name, p] of Object.entries(players)) { if(p.isVerified) active.push({name, ...p}); else pending.push({name, ...p}); }
