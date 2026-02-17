@@ -143,11 +143,19 @@
         }
         #locked-screen.visible, #spectator-screen.visible, #eliminated-screen.visible { display: flex; }
         
-        #status-toast { 
-            position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); 
-            background: var(--success-color); color: black; padding: 12px 25px; border-radius: 30px; 
-            font-weight: bold; display: none; z-index: 200; box-shadow: 0 10px 20px rgba(0,0,0,0.5); 
+        /* STATUS PROGRESS */
+        #status-progress {
+            position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
+            background: #333; color: #ccc;
+            padding: 12px 25px; border-radius: 30px;
+            font-weight: bold; font-size: 1.1rem;
+            display: none; z-index: 200; 
+            box-shadow: 0 10px 25px rgba(0,0,0,0.6);
+            border: 1px solid #444;
+            transition: background 0.3s, color 0.3s, transform 0.2s;
+            white-space: nowrap;
         }
+        #status-progress.done { background: var(--success-color); color: black; border-color: var(--success-color); }
 
         /* Audio/Image */
         .image-wrapper img { max-width: 100%; border-radius: 12px; box-shadow: var(--shadow); border: 1px solid #333; max-height: 300px; object-fit: contain; background: black; }
@@ -159,8 +167,10 @@
 
     <audio id="global-audio-player" playsinline></audio>
 
+    <!-- Sidebar Overlay -->
     <div class="sidebar-overlay" id="sidebar-overlay" onclick="toggleSidebar()"></div>
 
+    <!-- Sidebar -->
     <div class="sidebar" id="sidebar">
         <div class="sidebar-header-row">
             <h3>TEILNEHMER</h3>
@@ -169,6 +179,7 @@
         <ul class="p-list" id="sidebar-list"></ul>
     </div>
 
+    <!-- Login -->
     <div id="login-overlay">
         <h2 style="color: var(--text-muted); font-size: 1rem; text-transform: uppercase; letter-spacing: 2px;">Willkommen</h2>
         <h1 id="welcome-name" style="margin: 0 0 20px 0;">Spieler</h1>
@@ -206,8 +217,10 @@
             <div class="q-text" id="display-question">Warte auf Start...</div>
         </div>
 
-        <div id="status-toast">✅ Antwort gesendet!</div>
+        <!-- STATUS BAR -->
+        <div id="status-progress">0/0 abgegeben</div>
         
+        <!-- Status Screens -->
         <div id="locked-screen">
             <div style="font-size:4rem; margin-bottom: 10px;">🔒</div>
             <h3>Abstimmung geschlossen</h3>
@@ -226,12 +239,15 @@
             <p>Leider keine Leben mehr.</p>
         </div>
 
+        <!-- MODES -->
+        <!-- Results -->
         <div id="mode-results" class="mode-container">
             <div id="correct-answer-display"></div>
-            <h3 style="text-align:center; margin: 10px 0; color: var(--text-muted); font-size: 0.9rem; text-transform: uppercase;">Antworten der Spieler</h3>
+            <h3 id="result-title" style="text-align:center; margin: 10px 0; color: var(--text-muted); font-size: 0.9rem; text-transform: uppercase;">Antworten der Spieler</h3>
             <div class="results-list" id="results-container" style="display: flex; flex-direction: column; gap: 10px;"></div>
         </div>
         
+        <!-- Offline Waiting -->
         <div id="mode-offline" class="mode-container">
             <div style="text-align: center; padding: 40px; background: var(--card-color); border-radius: 12px; border: 1px dashed #444;">
                 <h2 style="margin-top:0;">📝 Manuelle Auswertung</h2>
@@ -239,6 +255,7 @@
             </div>
         </div>
 
+        <!-- Inputs -->
         <div id="mode-mc" class="mode-container">
             <div class="mc-grid" id="mc-container"></div>
         </div>
@@ -273,6 +290,7 @@
         </div>
     </div>
 
+    <!-- LOGIC SCRIPT -->
     <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io();
@@ -338,39 +356,104 @@
         socket.on('player_login_success', () => { document.getElementById('login-overlay').style.display = 'none'; const inputCode = document.getElementById('player-code').value; if (inputCode) localStorage.setItem(STORAGE_KEY, inputCode); });
         socket.on('player_login_fail', (msg) => { document.getElementById('login-msg').innerText = msg || "Falscher Code"; localStorage.removeItem(STORAGE_KEY); document.getElementById('login-overlay').style.display = 'flex'; });
         
+        // --- HAUPT GAME LOOP ---
         socket.on('update_game_state', (data) => {
             if (localGameId && localGameId !== data.gameId) { localStorage.removeItem(STORAGE_KEY); localGameId = data.gameId; document.getElementById('login-overlay').style.display = 'flex'; document.getElementById('player-code').value = ''; document.getElementById('login-msg').innerText = "Neues Spiel gestartet!"; socket.emit('player_announce', username); return; }
             localGameId = data.gameId;
-            renderSidebar(data.players); currentHistory = data.history || []; document.getElementById('round-display').innerText = `Runde ${data.roundNumber}`;
-            const round = data.round; const me = data.players[username];
+            
+            renderSidebar(data.players); 
+            currentHistory = data.history || []; 
+            document.getElementById('round-display').innerText = `Runde ${data.roundNumber}`;
+            
+            const round = data.round; 
+            const me = data.players[username];
+
             if (!me && document.getElementById('login-overlay').style.display === 'none') { socket.emit('player_announce', username); return; }
             if (document.getElementById('login-overlay').style.display !== 'none') return;
             
+            // ELIMINATED CHECK
             if (me && me.lives <= 0) {
                 hideAllModes();
                 document.getElementById('eliminated-screen').classList.add('visible');
                 document.getElementById('spectator-screen').classList.remove('visible');
                 document.getElementById('locked-screen').classList.remove('visible');
-                if (round.revealed) { document.getElementById('eliminated-screen').classList.remove('visible'); switchMode('RESULTS', round, data.players); }
+                document.getElementById('status-progress').style.display = 'none'; 
+                
+                if (round.revealed) { 
+                    document.getElementById('eliminated-screen').classList.remove('visible'); 
+                    switchMode('RESULTS', round, data.players); 
+                }
                 return;
             } else {
                 document.getElementById('eliminated-screen').classList.remove('visible');
             }
 
+            // SPECTATOR CHECK
             const isSpectator = round.targetPlayers && round.targetPlayers.length > 0 && !round.targetPlayers.includes(username);
             if (isSpectator && !round.revealed) { 
-                hideAllModes(); document.getElementById('spectator-screen').classList.add('visible'); document.getElementById('locked-screen').classList.remove('visible'); return; 
+                hideAllModes(); 
+                document.getElementById('spectator-screen').classList.add('visible'); 
+                document.getElementById('locked-screen').classList.remove('visible'); 
+                document.getElementById('status-progress').style.display = 'none'; 
+                return; 
             } else { 
                 document.getElementById('spectator-screen').classList.remove('visible'); 
             }
 
-            if (round.revealed) { document.getElementById('locked-screen').classList.remove('visible'); document.getElementById('status-toast').style.display = 'none'; switchMode('RESULTS', round, data.players); return; }
-            if (!round.answeringOpen && round.type !== 'WAITING') { document.getElementById('locked-screen').classList.add('visible'); document.getElementById('status-toast').style.display = 'none'; return; } else { document.getElementById('locked-screen').classList.remove('visible'); }
-            if (me && me.hasAnswered) document.getElementById('status-toast').style.display = 'block'; else document.getElementById('status-toast').style.display = 'none';
+            updateStatusBar(round, data.players, me);
+
+            if (round.revealed) { 
+                document.getElementById('locked-screen').classList.remove('visible'); 
+                switchMode('RESULTS', round, data.players); 
+                return; 
+            }
+            if (!round.answeringOpen && round.type !== 'WAITING') { 
+                document.getElementById('locked-screen').classList.add('visible'); 
+                return; 
+            } else { 
+                document.getElementById('locked-screen').classList.remove('visible'); 
+            }
             
             const currentSignature = round.type + "::" + round.question + "::" + JSON.stringify(round.options || []) + "::" + (round.imageData ? "IMG" : "NOIMG") + "::" + (round.audioData ? "AUDIO" : "NOAUDIO");
-            if (currentSignature !== lastRoundSignature) { lastRoundSignature = currentSignature; switchMode(round.type, round, data.players); } else { if (round.type === 'PLAYER_VOTE') renderPlayerCards(data.players); }
+            if (currentSignature !== lastRoundSignature) { 
+                lastRoundSignature = currentSignature; 
+                switchMode(round.type, round, data.players); 
+            } else { 
+                if (round.type === 'PLAYER_VOTE') renderPlayerCards(data.players); 
+            }
         });
+
+        function updateStatusBar(round, allPlayers, me) {
+            const statusBar = document.getElementById('status-progress');
+            
+            if (round.type === 'WAITING' || round.revealed || round.type === 'OFFLINE_RESULTS') {
+                statusBar.style.display = 'none';
+                return;
+            }
+
+            let participatingPlayers = Object.entries(allPlayers).filter(([name, p]) => p.lives > 0);
+            
+            if (round.targetPlayers && round.targetPlayers.length > 0) {
+                participatingPlayers = participatingPlayers.filter(([name, p]) => round.targetPlayers.includes(name));
+            }
+            
+            const totalCount = participatingPlayers.length;
+            const answeredCount = participatingPlayers.filter(([name, p]) => p.hasAnswered).length;
+
+            statusBar.style.display = 'block';
+            
+            if (me && me.hasAnswered) {
+                statusBar.classList.add('done');
+                statusBar.innerHTML = `✅ ${answeredCount} / ${totalCount} abgegeben`;
+                if(statusBar.innerText !== `✅ ${answeredCount} / ${totalCount} abgegeben`) {
+                    statusBar.style.transform = "translateX(-50%) scale(1.05)";
+                    setTimeout(() => statusBar.style.transform = "translateX(-50%) scale(1)", 100);
+                }
+            } else {
+                statusBar.classList.remove('done');
+                statusBar.innerHTML = `⏳ ${answeredCount} / ${totalCount} abgegeben`;
+            }
+        }
 
         function renderSidebar(players) {
             const list = document.getElementById('sidebar-list'); list.innerHTML = '';
@@ -435,11 +518,69 @@
 
         function renderResultsTable(allPlayers, roundData) {
             const solDiv = document.getElementById('correct-answer-display');
+            const cont = document.getElementById('results-container'); 
+            const title = document.getElementById('result-title');
+            cont.innerHTML = '';
+
+            // --- SPECIAL HANDLING: PLAYER_VOTE ---
+            if (roundData.type === 'PLAYER_VOTE') {
+                solDiv.innerHTML = ''; 
+                title.innerText = "VOTING ERGEBNIS";
+                
+                // 1. Stimmen zählen
+                const votes = {};
+                let maxVotes = 0;
+                
+                for (const [voterName, p] of Object.entries(allPlayers)) {
+                    if (p.hasAnswered && p.answer) {
+                        const target = p.answer;
+                        if (!votes[target]) votes[target] = 0;
+                        let weight = 1;
+                        // PowerVoter Logik
+                        if (roundData.powerVoter && Array.isArray(roundData.powerVoter) && roundData.powerVoter.includes(voterName)) {
+                            weight = 2;
+                        }
+                        votes[target] += weight;
+                        if (votes[target] > maxVotes) maxVotes = votes[target];
+                    }
+                }
+
+                // 2. Sortieren
+                const sortedVotes = Object.entries(votes).sort((a,b) => b[1] - a[1]);
+
+                // 3. Anzeigen
+                if (sortedVotes.length === 0) {
+                    cont.innerHTML = '<div style="text-align:center; color:#888;">Niemand hat gewählt.</div>';
+                    return;
+                }
+
+                sortedVotes.forEach(([name, count]) => {
+                    const isLeader = count === maxVotes;
+                    const borderStyle = isLeader ? 'border: 2px solid #ef4444;' : 'border: 1px solid #333;';
+                    const bgStyle = isLeader ? 'background: rgba(239, 68, 68, 0.15);' : 'background: var(--card-color);';
+                    const textStyle = isLeader ? 'color: #fca5a5;' : 'color: white;';
+                    const icon = isLeader ? '💀 ' : '';
+                    
+                    const el = document.createElement('div');
+                    el.className = 'result-card';
+                    el.style.cssText = `${bgStyle} ${borderStyle} display:flex; justify-content:space-between; align-items:center; padding:15px; border-radius:10px; border-left:none;`; // Reset default left border
+                    
+                    el.innerHTML = `
+                        <div style="font-size:1.1rem; font-weight:bold; ${textStyle}">${icon}${name}</div>
+                        <div style="font-size:1.2rem; font-weight:bold; ${textStyle}">${count} Stimmen</div>
+                    `;
+                    cont.appendChild(el);
+                });
+                return;
+            }
+
+            // --- STANDARD RESULTS ---
+            title.innerText = "ANTWORTEN DER SPIELER";
             if (roundData.correctAnswer) {
                 let txt = formatAnswer(roundData.correctAnswer);
                 solDiv.innerHTML = `<div class="correct-answer-card"><strong>🏆 LÖSUNG</strong><br><span style="font-size:1.2rem;">${txt}</span></div>`;
             } else solDiv.innerHTML = '';
-            const cont = document.getElementById('results-container'); cont.innerHTML = '';
+            
             for(const [name, p] of Object.entries(allPlayers)) {
                 if(p.answer) {
                     let ans = formatAnswer(p.answer); let extras = "";
@@ -525,7 +666,7 @@
             document.querySelectorAll('.match-row').forEach(row => { const l = row.querySelector('.match-label').getAttribute('data-left'); const r = row.querySelector('.match-select').value; if(!r) complete = false; result[l] = r; });
             if(!complete) alert("Bitte alles zuordnen"); else sendAnswer(result);
         }
-        socket.on('answer_confirmed', () => { const t = document.getElementById('status-toast'); t.style.display = 'block'; setTimeout(() => t.style.display = 'none', 2000); });
+        socket.on('answer_confirmed', () => { /* Optional: Sound abspielen */ });
     </script>
 </body>
 </html>
