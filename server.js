@@ -33,7 +33,8 @@ const GM_PASSWORD = "admin";
 // --- GAME STATE ---
 let currentGameId = "init"; 
 let players = {}; 
-let currentRound = { 
+// Standard-Werte für eine Runde
+const DEFAULT_ROUND = { 
     type: 'WAITING', question: '', 
     options: [], pairs: [], shuffledRight: [], targetPlayers: [], 
     min: 0, max: 100, 
@@ -42,6 +43,7 @@ let currentRound = {
     audioData: null, 
     imageData: null 
 };
+let currentRound = { ...DEFAULT_ROUND };
 let sessionHistory = [];
 let globalRoundCounter = 1;
 
@@ -64,11 +66,13 @@ async function initServer() {
         const meta = await META_DOC_REF.get();
         if (meta.exists && meta.data().activeGameId) {
             currentGameId = meta.data().activeGameId;
+            console.log(`🔄 Lade Spiel-ID: ${currentGameId}`);
             await loadGameData();
         } else {
             await startNewGameInternal();
         }
     } catch (e) {
+        console.error("Fehler beim Server-Start:", e);
         await startNewGameInternal();
     }
 }
@@ -76,28 +80,47 @@ async function initServer() {
 async function startNewGameInternal() {
     currentGameId = `game_${Date.now()}`;
     players = {};
-    currentRound = { type: 'WAITING', question: '', revealed: false, answeringOpen: false, options: [], pairs: [], targetPlayers: [], correctAnswer: null, audioData: null, imageData: null };
+    currentRound = { ...DEFAULT_ROUND };
     sessionHistory = [];
     globalRoundCounter = 1;
+    console.log(`✨ Neues Spiel erstellt: ${currentGameId}`);
+    
     await META_DOC_REF.set({ activeGameId: currentGameId });
     saveGame();
 }
 
 async function loadGameData() {
-    const doc = await getGameDoc().get();
-    if (doc.exists) {
-        const data = doc.data();
-        players = data.players || {};
-        currentRound = data.currentRound || { type: 'WAITING', question: '', revealed: false, answeringOpen: false, audioData: null, imageData: null };
-        sessionHistory = data.sessionHistory || [];
-        globalRoundCounter = data.globalRoundCounter || 1;
-        for (let p in players) players[p].connected = false;
-    } else {
-        saveGame();
+    try {
+        const doc = await getGameDoc().get();
+        if (doc.exists) {
+            const data = doc.data();
+            players = data.players || {};
+            
+            // WICHTIG: AudioData/ImageData wiederherstellen (sind nicht in DB)
+            const loadedRound = data.currentRound || {};
+            currentRound = { 
+                ...DEFAULT_ROUND, 
+                ...loadedRound, 
+                audioData: null, 
+                imageData: null 
+            };
+            
+            sessionHistory = data.sessionHistory || [];
+            globalRoundCounter = data.globalRoundCounter || 1;
+            
+            // Alle auf offline setzen beim Start
+            for (let p in players) players[p].connected = false;
+            console.log(`📥 Daten geladen. ${Object.keys(players).length} Spieler.`);
+        } else {
+            saveGame();
+        }
+    } catch (e) {
+        console.error("Fehler beim Laden:", e);
     }
 }
 
 function saveGame() {
+    // TRICK: Kopie OHNE Audio/Bild für die Datenbank
     const roundToSave = { ...currentRound };
     delete roundToSave.audioData; 
     delete roundToSave.imageData; 
@@ -122,46 +145,56 @@ app.get('/p/:name', (req, res) => res.sendFile(path.join(__dirname, 'public', 'p
 io.on('connection', (socket) => {
     
     const broadcastState = () => {
-        const publicPlayers = {};
-        for (const [name, data] of Object.entries(players)) {
-            if (!data.isVerified) continue;
-            const answerVisible = currentRound.revealed ? data.answer : null;
-            publicPlayers[name] = { 
-                lives: data.lives, 
-                hasAnswered: data.hasAnswered,
-                connected: data.connected,
-                answer: answerVisible
-            };
-        }
-        
-        io.emit('update_game_state', {
-            gameId: currentGameId,
-            round: currentRound,
-            players: publicPlayers,
-            history: sessionHistory,
-            roundNumber: globalRoundCounter
-        });
+        try {
+            const publicPlayers = {};
+            for (const [name, data] of Object.entries(players)) {
+                if (!data.isVerified) continue;
+                const answerVisible = currentRound.revealed ? data.answer : null;
+                publicPlayers[name] = { 
+                    lives: data.lives, 
+                    hasAnswered: data.hasAnswered,
+                    connected: data.connected,
+                    answer: answerVisible
+                };
+            }
+            
+            io.emit('update_game_state', {
+                gameId: currentGameId,
+                round: currentRound, 
+                players: publicPlayers,
+                history: sessionHistory,
+                roundNumber: globalRoundCounter
+            });
 
-        io.to('gamemaster_room').emit('gm_update_full', {
-            gameId: currentGameId,
-            round: currentRound,
-            players: players, 
-            history: sessionHistory,
-            roundNumber: globalRoundCounter
-        });
+            io.to('gamemaster_room').emit('gm_update_full', {
+                gameId: currentGameId,
+                round: currentRound,
+                players: players, 
+                history: sessionHistory,
+                roundNumber: globalRoundCounter
+            });
+        } catch (e) {
+            console.error("Fehler beim Broadcast:", e);
+        }
     };
 
+    // --- GM LOGIN ---
     socket.on('gm_login', (pw) => {
-        if (pw === GM_PASSWORD) {
+        console.log(`🔑 Login Versuch mit: '${pw}'`);
+        // Trim entfernt Leerzeichen am Anfang/Ende
+        if (pw && pw.trim() === GM_PASSWORD) {
             socket.join('gamemaster_room');
             socket.emit('gm_login_success');
+            console.log("✅ GM erfolgreich eingeloggt.");
             broadcastState();
         } else {
+            console.warn("⛔ GM Login fehlgeschlagen.");
             socket.emit('gm_login_fail');
         }
     });
 
     socket.on('gm_reset_all', async () => {
+        console.log("🧨 GM RESET triggered");
         saveGame();
         await startNewGameInternal();
         broadcastState();
@@ -187,11 +220,7 @@ io.on('connection', (socket) => {
         sessionHistory = [];
         globalRoundCounter++;
         
-        currentRound = {
-            type: 'WAITING', question: 'Runde beendet.', revealed: false, answeringOpen: false, 
-            options: [], pairs: [], targetPlayers: [], correctAnswer: null, shuffledRight: [], 
-            audioData: null, imageData: null
-        };
+        currentRound = { ...DEFAULT_ROUND, question: 'Runde beendet.' };
         
         for (let p in players) {
             players[p].hasAnswered = false;
@@ -264,7 +293,6 @@ io.on('connection', (socket) => {
     socket.on('gm_close_answering', () => { currentRound.answeringOpen = false; saveGame(); broadcastState(); });
     socket.on('gm_reveal', () => { currentRound.revealed = true; currentRound.answeringOpen = false; saveGame(); broadcastState(); });
     
-    // MODIFIED: Begrenzung 0 bis 5
     socket.on('gm_modify_lives', (data) => { 
         if (players[data.user]) { 
             let newLives = players[data.user].lives + data.amount;
@@ -319,8 +347,7 @@ io.on('connection', (socket) => {
         const p = players[data.user];
         if (!p || !p.isVerified) return;
         
-        // Blockiere Antworten von eliminierten Spielern (Server-seitiger Schutz)
-        if (p.lives <= 0) return;
+        if (p.lives <= 0) return; // Tote können nicht wählen
 
         if (currentRound.targetPlayers?.length > 0 && !currentRound.targetPlayers.includes(data.user)) return;
         if (currentRound.answeringOpen) {
