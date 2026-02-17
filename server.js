@@ -25,7 +25,7 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server, { 
     cors: { origin: "*" },
-    maxHttpBufferSize: 1e7 // 10 MB Limit
+    maxHttpBufferSize: 1e7 
 });
 
 const GM_PASSWORD = "admin"; 
@@ -60,7 +60,6 @@ function shuffleArray(array) {
     return arr;
 }
 
-// --- DB HELPER ---
 const getGameDoc = () => db.collection('games').doc(currentGameId);
 const getArchiveCol = () => db.collection('games').doc(currentGameId).collection('archived_rounds');
 
@@ -87,7 +86,6 @@ async function startNewGameInternal() {
     sessionHistory = [];
     globalRoundCounter = 1;
     console.log(`✨ Neues Spiel erstellt: ${currentGameId}`);
-    
     await META_DOC_REF.set({ activeGameId: currentGameId });
     saveGame();
 }
@@ -98,21 +96,16 @@ async function loadGameData() {
         if (doc.exists) {
             const data = doc.data();
             players = data.players || {};
-            
-            // Runde wiederherstellen
             const loadedRound = data.currentRound || {};
             currentRound = { 
                 ...DEFAULT_ROUND, 
                 ...loadedRound, 
-                // RAM-Daten nicht laden, da nicht gespeichert
                 audioData: null, 
                 imageData: null,
                 powerVoter: loadedRound.powerVoter || []
             };
-            
             sessionHistory = data.sessionHistory || [];
             globalRoundCounter = data.globalRoundCounter || 1;
-            
             for (let p in players) players[p].connected = false;
             console.log(`📥 Daten geladen. ${Object.keys(players).length} Spieler.`);
         } else {
@@ -124,7 +117,6 @@ async function loadGameData() {
 }
 
 function saveGame() {
-    // Kopie ohne RAM-Daten erstellen
     const roundToSave = { ...currentRound };
     delete roundToSave.audioData; 
     delete roundToSave.imageData; 
@@ -147,25 +139,19 @@ app.get('/gm', (req, res) => res.sendFile(path.join(__dirname, 'public', 'gamema
 app.get('/p/:name', (req, res) => res.sendFile(path.join(__dirname, 'public', 'player.html')));
 app.get('/stats', (req, res) => res.sendFile(path.join(__dirname, 'public', 'analysis.html')));
 
-
 io.on('connection', (socket) => {
     
     const broadcastState = () => {
         try {
-            // 1. Daten für Spieler (Gefiltert)
             const publicPlayers = {};
             for (const [name, data] of Object.entries(players)) {
-                // Nur verifizierte Spieler senden!
                 if (!data.isVerified) continue;
-
                 const answerVisible = currentRound.revealed ? data.answer : null;
                 publicPlayers[name] = { 
                     lives: data.lives, 
                     hasAnswered: data.hasAnswered,
                     connected: data.connected,
                     answer: answerVisible
-                    // WICHTIG: Kein 'code' oder 'isVerified' Flag nötig, 
-                    // da Anwesenheit in dieser Liste = Verified bedeutet.
                 };
             }
             
@@ -177,18 +163,16 @@ io.on('connection', (socket) => {
                 roundNumber: globalRoundCounter
             });
 
-            // 2. Daten für GM (Vollständig)
             io.to('gamemaster_room').emit('gm_update_full', {
                 gameId: currentGameId,
                 round: currentRound,
-                players: players, // Enthält auch Pending Spieler & Codes
+                players: players, 
                 history: sessionHistory,
                 roundNumber: globalRoundCounter
             });
         } catch (e) { console.error("Broadcast Error", e); }
     };
 
-    // --- GM ---
     socket.on('gm_login', (pw) => {
         if (pw && pw.trim() === GM_PASSWORD) {
             socket.join('gamemaster_room');
@@ -220,7 +204,6 @@ io.on('connection', (socket) => {
 
     socket.on('gm_next_round_phase', () => {
         archiveCurrentQuestion();
-        
         const livesSnapshot = {};
         for (const [name, p] of Object.entries(players)) livesSnapshot[name] = p.lives;
 
@@ -233,27 +216,21 @@ io.on('connection', (socket) => {
 
         sessionHistory = [];
         globalRoundCounter++;
-        
         currentRound = { ...DEFAULT_ROUND, question: 'Runde beendet.' };
-        
         for (let p in players) {
             players[p].hasAnswered = false;
             players[p].answer = null;
         }
-
         saveGame();
         broadcastState();
     });
 
     socket.on('gm_start_round', (data) => {
-        // Alte Frage archivieren
         archiveCurrentQuestion();
 
-        // Wenn "Neue Runde" Button gedrückt wurde: Erst archivieren & erhöhen
         if (data.isNewGameRound) {
              const livesSnapshot = {};
             for (const [name, p] of Object.entries(players)) livesSnapshot[name] = p.lives;
-
             getArchiveCol().add({
                 roundId: globalRoundCounter,
                 timestamp: admin.firestore.FieldValue.serverTimestamp(),
@@ -264,17 +241,15 @@ io.on('connection', (socket) => {
             globalRoundCounter++;
         }
 
-        // Frage vorbereiten
         let roundOptions = data.options || [];
         let correctAnswer = data.correctAnswer;
         let shuffledRight = [];
 
-        // Mischen
         if (data.type === 'MC') {
             roundOptions = shuffleArray(data.options);
         }
         else if (data.type === 'SEQUENCE') {
-            correctAnswer = [...data.options]; // Originalreihenfolge ist Lösung
+            correctAnswer = [...data.options]; 
             roundOptions = shuffleArray(data.options);
         }
         else if (data.type === 'MATCHING') {
@@ -282,7 +257,6 @@ io.on('connection', (socket) => {
             shuffledRight = shuffleArray(rightSide);
         }
 
-        // Neue Runde setzen
         currentRound = {
             type: data.type,
             question: data.question,
@@ -300,12 +274,10 @@ io.on('connection', (socket) => {
             answeringOpen: true 
         };
         
-        // Reset Spieler Antworten
         for (let p in players) {
             players[p].hasAnswered = false;
             players[p].answer = null;
         }
-        
         saveGame(); 
         broadcastState(); 
     });
@@ -342,7 +314,6 @@ io.on('connection', (socket) => {
     socket.on('gm_create_player', (name) => {
         if (!name) return;
         const code = Math.floor(1000 + Math.random() * 9000).toString();
-        // Überschreiben/Neu anlegen
         players[name] = { code, lives: 3, hasAnswered: false, answer: null, connected: false, isVerified: false };
         saveGame();
         io.to('gamemaster_room').emit('gm_player_joined', { name, code, isManual: true });
@@ -357,11 +328,8 @@ io.on('connection', (socket) => {
             isNew = true;
         } else {
             players[name].connected = true;
-            // Wenn schon verifiziert, direkt rein
             if(players[name].isVerified) socket.emit('player_login_success');
         }
-        
-        // GM Benachrichtigen wenn neu ODER noch nicht verifiziert
         if (isNew || !players[name].isVerified) {
             io.to('gamemaster_room').emit('gm_player_joined', { name, code: players[name].code, isManual: false });
         }
