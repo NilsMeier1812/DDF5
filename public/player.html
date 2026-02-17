@@ -5,181 +5,162 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Voting Pad</title>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; margin: 0; padding: 0; background: #222; color: white; display: flex; height: 100vh; overflow: hidden; position: relative;}
-        
-        /* --- SIDEBAR BASE (MOBILE FIRST) --- */
+        :root {
+            --bg-color: #121212;
+            --card-color: #1e1e1e;
+            --accent-color: #3b82f6; /* Modern Blue */
+            --accent-hover: #2563eb;
+            --danger-color: #ef4444;
+            --success-color: #22c55e;
+            --text-main: #f3f4f6;
+            --text-muted: #9ca3af;
+            --radius: 16px;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
+        }
+
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 0; background: var(--bg-color); color: var(--text-main); display: flex; height: 100vh; overflow: hidden; position: relative; }
+        * { box-sizing: border-box; }
+
+        /* --- SIDEBAR --- */
         .sidebar { 
-            width: 280px; 
-            background: #2c2c2c; 
-            border-right: 1px solid #444; 
-            display: flex; flex-direction: column; overflow-y: auto; flex-shrink: 0;
-            
-            /* Mobile Default: Absolute & Off-Canvas */
-            position: absolute; 
-            top: 0; left: 0; height: 100%; 
-            z-index: 500;
-            transform: translateX(-100%); 
-            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), width 0.3s ease; /* Transition für beide Modi */
-            box-shadow: 5px 0 25px rgba(0,0,0,0.7);
+            width: 280px; background: #18181b; border-right: 1px solid #27272a; 
+            display: flex; flex-direction: column; position: fixed; top: 0; left: 0; height: 100%; z-index: 500;
+            transform: translateX(-100%); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 10px 0 30px rgba(0,0,0,0.5);
         }
-        
         .sidebar.open { transform: translateX(0); }
-        
-        .sidebar-header-row {
-            display: flex; justify-content: space-between; align-items: center;
-            padding: 15px 20px; background: #222; border-bottom: 1px solid #444;
-            min-height: 25px; /* Damit Layout beim Einklappen stabil bleibt */
-        }
-        .sidebar-header-row h3 { margin: 0; font-size: 1rem; color: #ddd; text-transform: uppercase; letter-spacing: 1px; white-space: nowrap; }
-        
-        .btn-close-sidebar {
-            background: none; border: none; color: #aaa; font-size: 1.5rem; cursor: pointer; padding: 0 5px;
-        }
-        .btn-close-sidebar:hover { color: white; }
-
-        /* Overlay nur für Mobile */
-        .sidebar-overlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.6); z-index: 400; display: none;
-            backdrop-filter: blur(2px);
-        }
+        .sidebar-header-row { padding: 20px; background: #27272a; display: flex; justify-content: space-between; align-items: center; }
+        .sidebar-header-row h3 { margin: 0; color: var(--text-main); font-size: 0.9rem; letter-spacing: 1.5px; }
+        .btn-close-sidebar { background: none; border: none; color: var(--text-main); font-size: 1.5rem; cursor: pointer; }
+        .sidebar-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 400; display: none; backdrop-filter: blur(4px); }
         .sidebar-overlay.active { display: block; }
+        
+        /* Liste der Spieler in Sidebar */
+        .p-list { list-style: none; padding: 0; margin: 0; overflow-y: auto; flex: 1; }
+        .p-item { padding: 15px 20px; border-bottom: 1px solid #27272a; display: flex; justify-content: space-between; align-items: center; }
+        .p-name { font-weight: 600; font-size: 0.95rem; }
+        .p-status { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--text-muted); }
+        .answered-icon { width: 10px; height: 10px; background: var(--success-color); border-radius: 50%; display: none; box-shadow: 0 0 8px var(--success-color); }
+        .answered-icon.visible { display: block; }
+        .p-item.eliminated .p-name { text-decoration: line-through; color: var(--danger-color); }
 
-        /* --- DESKTOP TWEAKS (Responsive) --- */
+        /* Desktop Sidebar fix */
         @media (min-width: 768px) {
-            .sidebar {
-                /* Desktop: Relative & Flex Flow */
-                position: relative; 
-                transform: none !important; /* Kein Slide-Effekt via Transform */
-                box-shadow: none;
-                width: 0; /* Zu Beginn "zugeklappt" via Breite */
-                border-right: none; /* Kein Rand wenn zu */
-                overflow: hidden; /* Inhalt verstecken wenn zu */
-            }
-            
-            .sidebar.open {
-                width: 280px; /* Aufklappen schiebt Content weg */
-                border-right: 1px solid #444;
-            }
-
-            /* Overlay auf Desktop ausblenden, damit man klicken kann */
+            .sidebar { position: relative; transform: none; width: 0; box-shadow: none; border: none; }
+            .sidebar.open { width: 280px; border-right: 1px solid #333; }
             .sidebar-overlay.active { display: none !important; }
         }
 
-        /* PLAYER LIST ITEMS */
-        .p-item { padding: 12px 20px; border-bottom: 1px solid #3a3a3a; font-size: 1rem; display: flex; justify-content: space-between; align-items: center; }
-        .p-name { font-weight: bold; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 140px;}
-        .p-status { display: flex; align-items: center; gap: 6px; font-size: 0.9rem; }
+        /* --- MAIN AREA --- */
+        .main-area { flex: 1; display: flex; flex-direction: column; padding: 20px; position: relative; overflow-y: auto; width: 100%; transition: width 0.3s; max-width: 800px; margin: 0 auto; }
         
-        .answered-icon { width: 10px; height: 10px; background: #2ecc71; border-radius: 50%; display: none; box-shadow: 0 0 5px #2ecc71;}
-        .answered-icon.visible { display: block; }
-        
-        .p-item.eliminated { opacity: 0.5; background: #1a1a1a; }
-        .p-item.eliminated .p-name { text-decoration: line-through; color: #777; }
-        .p-item.eliminated .p-status { color: #555; }
-
-        /* --- HEADER & TOGGLE --- */
-        .q-header { 
-            margin-bottom: 20px; text-align: center; position: relative; width: 100%; 
-            display: flex; flex-direction: column; align-items: center; justify-content: center; 
-            padding-top: 20px;
-        }
-        
+        /* Header & Question */
         .sidebar-toggle { 
-            position: absolute; left: 20px; top: 20px; 
-            background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); 
-            color: white; cursor: pointer; padding: 10px; z-index: 50; border-radius: 8px;
-            display: flex; align-items: center; justify-content: center;
-            transition: background 0.2s;
+            position: absolute; left: 20px; top: 20px; background: var(--card-color); border: 1px solid #333; 
+            color: var(--text-main); border-radius: 8px; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 50; transition: 0.2s; 
         }
-        .sidebar-toggle:active { background: rgba(255,255,255,0.2); transform: scale(0.95); }
-        .sidebar-toggle svg { width: 24px; height: 24px; }
+        .sidebar-toggle:hover { background: #333; }
+        .sidebar-toggle svg { width: 20px; height: 20px; }
 
-        /* MAIN AREA */
-        .main-area { flex: 1; display: flex; flex-direction: column; padding: 20px; position: relative; overflow-y: auto; width: 100%; box-sizing: border-box; transition: width 0.3s ease;}
+        .q-header { margin-top: 40px; margin-bottom: 20px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 15px; }
+        .round-indicator { color: var(--accent-color); font-size: 0.8rem; font-weight: 800; text-transform: uppercase; letter-spacing: 2px; background: rgba(59, 130, 246, 0.1); padding: 5px 12px; border-radius: 20px; }
         
-        #login-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #111; z-index: 2000; display: flex; flex-direction: column; justify-content: center; align-items: center; }
-        .code-input { font-size: 2rem; padding: 10px; text-align: center; width: 120px; border-radius: 10px; border: none; margin-bottom: 20px; letter-spacing: 5px; color: black;}
-        .btn-submit { background: #3498db; color: white; padding: 15px 30px; font-size: 1.2rem; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; }
+        .q-text { 
+            font-size: 1.4rem; line-height: 1.4; font-weight: 700; background: var(--card-color); 
+            padding: 25px; border-radius: var(--radius); border: 1px solid #333; 
+            width: 100%; box-shadow: var(--shadow); text-align: center;
+        }
 
-        .round-indicator { color: #888; font-size: 0.9rem; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 2px; }
-        .q-text { font-size: 1.2rem; background: rgba(255,255,255,0.1); padding: 15px; border-radius: 10px; display: inline-block; min-width: 50%; max-width: 90%; }
+        /* --- LOGIN OVERLAY --- */
+        #login-overlay { 
+            position: fixed; inset: 0; background: var(--bg-color); z-index: 2000; 
+            display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px; 
+        }
+        #login-overlay h2 { margin-bottom: 5px; font-size: 2rem; }
+        .code-input { 
+            font-size: 2.5rem; padding: 15px; text-align: center; width: 200px; 
+            background: #000; border: 2px solid #333; color: var(--accent-color); 
+            border-radius: 12px; margin: 30px 0; letter-spacing: 8px; font-family: monospace; outline: none; transition: border 0.2s;
+        }
+        .code-input:focus { border-color: var(--accent-color); }
+        
+        /* GLOBAL BUTTONS */
+        .btn-submit { 
+            background: var(--accent-color); color: white; padding: 16px 40px; font-size: 1.1rem; border: none; 
+            border-radius: 12px; cursor: pointer; font-weight: 600; width: 100%; max-width: 300px; 
+            box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4); transition: transform 0.1s, box-shadow 0.2s; 
+        }
+        .btn-submit:active { transform: scale(0.98); }
 
-        .mode-container { display: none; height: 100%; flex-direction: column; }
+        /* --- MODES --- */
+        .mode-container { display: none; flex-direction: column; gap: 20px; width: 100%; }
         .mode-container.active { display: flex; }
 
-        /* INPUT STYLES */
-        .mc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; flex: 1; margin-bottom: 20px; align-content: center; }
-        .btn-mc { border: none; border-radius: 10px; font-size: 1.2rem; font-weight: bold; color: white; cursor: pointer; padding: 20px; background: #444; min-height: 80px; word-wrap: break-word;}
-        .btn-mc:active { transform: scale(0.95); background: #666; }
+        /* MC Grid */
+        .mc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 10px; }
+        .btn-mc { 
+            border: none; border-radius: var(--radius); font-size: 1.1rem; font-weight: 700; color: white; 
+            cursor: pointer; padding: 20px; min-height: 100px; display: flex; align-items: center; justify-content: center; text-align: center;
+            box-shadow: var(--shadow); transition: filter 0.2s, transform 0.1s;
+        }
+        .btn-mc:active { transform: scale(0.96); filter: brightness(0.8); }
+
+        /* Inputs */
+        textarea { 
+            width: 100%; height: 140px; padding: 20px; font-size: 1.1rem; background: var(--card-color); 
+            color: white; border: 1px solid #333; border-radius: var(--radius); outline: none; resize: none; 
+        }
+        textarea:focus { border-color: var(--accent-color); }
+
+        /* Voting List */
+        .vote-card { background: var(--card-color); border-radius: 12px; padding: 5px; display: flex; flex-direction: column; border: 1px solid #333; }
+        .vote-card-header { display: flex; justify-content: space-between; align-items: center; padding: 10px 15px; }
+        .vote-name { font-weight: bold; font-size: 1.1rem; }
+        .btn-inspect { background: #333; border: none; color: #ccc; width: 40px; height: 40px; border-radius: 8px; cursor: pointer; margin-right: 10px;}
+        .btn-vote-action { background: var(--danger-color); border: none; color: white; padding: 10px 20px; border-radius: 8px; font-weight: bold; cursor: pointer; }
+        .vote-history { background: #111; padding: 15px; display: none; border-top: 1px solid #333; font-size: 0.9rem; }
+        .vote-history.show { display: block; }
+
+        /* Matching & Sequence */
+        .match-row, .seq-item { background: var(--card-color); padding: 15px; border-radius: 10px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #333; }
+        .match-select { background: #000; color: white; padding: 10px; border: 1px solid #444; border-radius: 6px; width: 50%; }
+        .btn-move { background: #333; color: white; border: none; width: 36px; height: 36px; border-radius: 6px; cursor: pointer; font-size: 1.2rem; display: flex; align-items: center; justify-content: center;}
+
+        /* Estimates */
+        .est-wrapper { display: flex; flex-direction: column; align-items: center; gap: 20px; padding: 20px; background: var(--card-color); border-radius: var(--radius); }
+        .est-input { font-size: 3rem; width: 100%; text-align: center; background: transparent; border: none; color: var(--accent-color); font-weight: bold; outline: none; }
+        .est-range { width: 100%; accent-color: var(--accent-color); height: 6px; }
+
+        /* Results & Status */
+        .result-card { background: var(--card-color); padding: 15px; border-radius: 10px; border-left: 4px solid var(--accent-color); display: flex; justify-content: space-between; align-items: center; }
+        .res-val { font-weight: bold; font-size: 1.1rem; }
+        .correct-answer-card { background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid #22c55e; padding: 20px; border-radius: var(--radius); text-align: center; margin-bottom: 20px; }
+
+        /* Overlays */
+        #locked-screen, #spectator-screen, #eliminated-screen { 
+            position: absolute; inset: 0; background: rgba(0,0,0,0.9); z-index: 100; 
+            display: none; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 30px; 
+        }
+        #locked-screen.visible, #spectator-screen.visible, #eliminated-screen.visible { display: flex; }
         
-        .text-input-wrapper { display: flex; flex-direction: column; gap: 15px; margin-top: 20px; }
-        textarea { width: 100%; height: 100px; padding: 15px; font-size: 1.2rem; border-radius: 10px; border: none; font-family: sans-serif; resize: none; box-sizing: border-box; color: black;}
+        #status-toast { 
+            position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); 
+            background: var(--success-color); color: black; padding: 12px 25px; border-radius: 30px; 
+            font-weight: bold; display: none; z-index: 200; box-shadow: 0 10px 20px rgba(0,0,0,0.5); 
+        }
 
-        .vote-list { display: flex; flex-direction: column; gap: 15px; overflow-y: auto; padding-bottom: 20px; margin-top: 10px;}
-        .vote-card { background: #333; border-radius: 10px; overflow: hidden; border: 1px solid #444; box-shadow: 0 4px 6px rgba(0,0,0,0.2); }
-        .vote-card-header { display: flex; justify-content: space-between; align-items: stretch; height: 60px; }
-        .vote-name { flex: 1; display: flex; align-items: center; padding-left: 20px; font-weight: bold; font-size: 1.2rem; }
-        .btn-inspect { background: #444; border: none; border-left: 1px solid #555; color: #aaa; padding: 0 20px; cursor: pointer; font-size: 1.2rem;}
-        .btn-vote-action { background: #e74c3c; border: none; color: white; padding: 0 25px; font-weight: bold; cursor: pointer; font-size: 1rem; text-transform: uppercase;}
-        .btn-vote-action:active { background: #c0392b; }
-        
-        .vote-history { background: #252525; padding: 15px; display: none; border-top: 1px solid #444; }
-        .vote-history.show { display: block; animation: fadeIn 0.2s; }
-        .history-item { margin-bottom: 10px; font-size: 0.9rem; border-bottom: 1px solid #333; padding-bottom: 8px; }
-        .h-q { display: block; color: #888; font-style: italic; margin-bottom: 2px; }
-        .h-a { color: #3498db; font-weight: bold; }
-
-        @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
-
-        .match-row, .seq-item { background: #333; padding: 10px; border-radius: 5px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;}
-        .match-select { color: black; padding: 5px; width: 50%; max-width: 200px; }
-        .btn-move { background: #555; color: white; border: none; width: 30px; height: 30px; margin-left: 2px; cursor: pointer; border-radius: 4px; }
-        .btn-move:disabled { opacity: 0.2; cursor: default; }
-
-        .est-wrapper { display: flex; flex-direction: column; align-items: center; gap: 20px; margin-top: 30px; }
-        .est-input { font-size: 3rem; width: 200px; text-align: center; background: #333; color: white; border: 2px solid #555; border-radius: 10px; padding: 10px; }
-        .est-range { width: 100%; max-width: 300px; }
-
-        .results-list { overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
-        .result-card { background: #444; padding: 10px; border-radius: 5px; }
-        .res-name { font-weight: bold; color: #aaa; font-size: 0.9rem; margin-bottom: 5px;}
-        .res-val { font-size: 1.1rem; font-weight: bold; color: white; white-space: pre-wrap;}
-
-        /* STATUS & OVERLAYS */
-        #status-toast { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); background: #2ecc71; color: white; padding: 10px 20px; border-radius: 20px; font-weight: bold; display: none; z-index: 100; box-shadow: 0 5px 15px rgba(0,0,0,0.5); }
-        #locked-screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 90; display: none; justify-content: center; align-items: center; flex-direction: column; text-align: center; }
-        #locked-screen.visible { display: flex; }
-        
-        #spectator-screen, #eliminated-screen { text-align: center; padding: 40px; display: none; margin-top: 50px;}
-        #spectator-screen.visible, #eliminated-screen.visible { display: block; }
-        #eliminated-screen h2 { color: #e74c3c; font-size: 2rem; }
-        
-        .correct-answer-card { background: #f1c40f; color: #222; padding: 15px; border-radius: 8px; margin-bottom: 20px; text-align: center; border: 2px solid #f39c12; font-weight: bold; }
-        
-        /* MEDIA / AUDIO CONTROL */
-        .image-wrapper { margin-bottom: 20px; text-align: center; }
-        .image-wrapper img { max-width: 100%; max-height: 400px; border-radius: 8px; border: 1px solid #444; }
-
-        .audio-wrapper { margin-bottom: 20px; background: rgba(255,255,255,0.1); padding: 15px; border-radius: 10px; display: none; }
-        .audio-status-line { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
-        .volume-control { display: flex; align-items: center; gap: 10px; font-size: 0.8rem; color: #aaa; }
-        input[type=range] { accent-color: #3498db; }
-        
-        #btn-enable-audio { background: #e67e22; border: none; color: white; padding: 10px; width: 100%; border-radius: 5px; cursor: pointer; font-weight: bold; margin-top: 5px; display: none; }
-        .audio-indicator { color: #2ecc71; font-weight: bold; display: flex; align-items: center; gap: 5px; }
-        .audio-indicator.inactive { color: #7f8c8d; }
-        .offline-wait-msg { text-align: center; padding: 40px; color: #aaa; font-style: italic; }
+        /* Audio/Image */
+        .image-wrapper img { max-width: 100%; border-radius: 12px; box-shadow: var(--shadow); border: 1px solid #333; max-height: 300px; object-fit: contain; background: black; }
+        .audio-wrapper { width: 100%; background: #222; padding: 15px; border-radius: 12px; display: none; margin-bottom: 15px; border: 1px solid #333; }
+        #btn-enable-audio { width: 100%; padding: 10px; background: #ea580c; border: none; color: white; border-radius: 6px; margin-top: 10px; cursor: pointer; }
     </style>
 </head>
 <body>
 
     <audio id="global-audio-player" playsinline></audio>
 
-    <!-- Sidebar Overlay (nur Mobile) -->
     <div class="sidebar-overlay" id="sidebar-overlay" onclick="toggleSidebar()"></div>
 
-    <!-- Sidebar -->
     <div class="sidebar" id="sidebar">
         <div class="sidebar-header-row">
             <h3>TEILNEHMER</h3>
@@ -189,15 +170,15 @@
     </div>
 
     <div id="login-overlay">
-        <h2>Hallo <span id="welcome-name"></span></h2>
-        <p style="color:#aaa;">Code eingeben:</p>
-        <input type="tel" maxlength="4" class="code-input" id="player-code" placeholder="----">
-        <button class="btn-submit" onclick="submitLogin()">Einloggen</button>
-        <p id="login-msg" style="color: #e74c3c; margin-top: 10px; font-weight:bold;"></p>
+        <h2 style="color: var(--text-muted); font-size: 1rem; text-transform: uppercase; letter-spacing: 2px;">Willkommen</h2>
+        <h1 id="welcome-name" style="margin: 0 0 20px 0;">Spieler</h1>
+        <p style="color:#666;">Bitte Code eingeben:</p>
+        <input type="tel" maxlength="4" class="code-input" id="player-code" placeholder="0000">
+        <button class="btn-submit" onclick="submitLogin()">STARTEN</button>
+        <p id="login-msg" style="color: var(--danger-color); margin-top: 20px; font-weight:bold;"></p>
     </div>
 
     <div class="main-area">
-        <!-- Neuer Toggle Button (Hamburger) -->
         <button class="sidebar-toggle" onclick="toggleSidebar()">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <line x1="3" y1="12" x2="21" y2="12"></line>
@@ -212,44 +193,84 @@
             <div id="image-container" class="image-wrapper" style="display:none;"></div>
             
             <div id="audio-ui" class="audio-wrapper">
-                <div class="audio-status-line">
-                    <div id="audio-state-text" class="audio-indicator inactive">🔇 Warten...</div>
-                    <div class="volume-control">
+                <div class="audio-status-line" style="display: flex; justify-content: space-between; align-items: center; font-size: 0.9rem;">
+                    <div id="audio-state-text" style="color: var(--accent-color); font-weight: bold;">🔇 Warten...</div>
+                    <div class="volume-control" style="display: flex; gap: 5px; align-items: center;">
                         <span>Vol</span>
-                        <input type="range" min="0" max="1" step="0.1" value="1" oninput="setVolume(this.value)">
+                        <input type="range" min="0" max="1" step="0.1" value="1" oninput="setVolume(this.value)" style="width: 80px;">
                     </div>
                 </div>
-                <button id="btn-enable-audio" onclick="enableAudio()">🔊 Audio aktivieren (Klicken!)</button>
+                <button id="btn-enable-audio" onclick="enableAudio()">🔊 Audio aktivieren</button>
             </div>
 
-            <div class="q-text" id="display-question">Warte...</div>
+            <div class="q-text" id="display-question">Warte auf Start...</div>
         </div>
 
-        <div id="status-toast">✅ Gesendet!</div>
-        <div id="locked-screen"><div style="font-size:3rem;">🔒</div><h3>Voting beendet</h3></div>
+        <div id="status-toast">✅ Antwort gesendet!</div>
         
-        <div id="spectator-screen"><h2 style="color:#aaa;">Nur Zuschauer</h2><p>Du nimmst an dieser Frage nicht teil.</p></div>
-        <div id="eliminated-screen"><h2>❌ Ausgeschieden</h2><p>Du hast keine Leben mehr.</p></div>
+        <div id="locked-screen">
+            <div style="font-size:4rem; margin-bottom: 10px;">🔒</div>
+            <h3>Abstimmung geschlossen</h3>
+            <p style="color: #888;">Bitte zum Gamemaster schauen</p>
+        </div>
+        
+        <div id="spectator-screen">
+            <div style="font-size:4rem; margin-bottom: 10px;">👀</div>
+            <h2>Zuschauer</h2>
+            <p>Du nimmst an dieser speziellen Frage nicht teil.</p>
+        </div>
+        
+        <div id="eliminated-screen">
+            <div style="font-size:4rem; margin-bottom: 10px;">💀</div>
+            <h2 style="color: var(--danger-color);">Ausgeschieden</h2>
+            <p>Leider keine Leben mehr.</p>
+        </div>
 
-        <!-- MODES -->
-        <div id="mode-results" class="mode-container"><div id="correct-answer-display"></div><h3 style="text-align:center; margin-top:0; color:#f39c12;">Antworten:</h3><div class="results-list" id="results-container"></div></div>
+        <div id="mode-results" class="mode-container">
+            <div id="correct-answer-display"></div>
+            <h3 style="text-align:center; margin: 10px 0; color: var(--text-muted); font-size: 0.9rem; text-transform: uppercase;">Antworten der Spieler</h3>
+            <div class="results-list" id="results-container" style="display: flex; flex-direction: column; gap: 10px;"></div>
+        </div>
         
-        <div id="mode-offline" class="mode-container"><div class="offline-wait-msg"><h2>👀 Schau zum Gamemaster</h2><p>Ergebnisse werden eingetragen...</p></div></div>
+        <div id="mode-offline" class="mode-container">
+            <div style="text-align: center; padding: 40px; background: var(--card-color); border-radius: 12px; border: 1px dashed #444;">
+                <h2 style="margin-top:0;">📝 Manuelle Auswertung</h2>
+                <p style="color: #aaa;">Der Gamemaster trägt die Ergebnisse gerade ein.</p>
+            </div>
+        </div>
 
-        <div id="mode-mc" class="mode-container"><div class="mc-grid" id="mc-container"></div></div>
-        <div id="mode-text" class="mode-container"><div class="text-input-wrapper"><textarea id="text-answer" placeholder="Antwort..."></textarea><button class="btn-submit" onclick="sendText()">Absenden</button></div></div>
+        <div id="mode-mc" class="mode-container">
+            <div class="mc-grid" id="mc-container"></div>
+        </div>
+
+        <div id="mode-text" class="mode-container">
+            <textarea id="text-answer" placeholder="Deine Antwort hier eingeben..."></textarea>
+            <button class="btn-submit" onclick="sendText()" style="width:100%; max-width:100%;">Absenden</button>
+        </div>
         
-        <!-- VOTING AREA -->
         <div id="mode-vote" class="mode-container">
-            <p style="text-align:center; color:#aaa; margin-top:0;">Verlauf prüfen & jemanden wählen:</p>
-            <div class="vote-list" id="vote-player-list"></div>
+            <p style="text-align:center; color:#aaa; margin-top:0;">Wähle einen Spieler:</p>
+            <div id="vote-player-list" style="display: flex; flex-direction: column; gap: 10px;"></div>
         </div>
         
-        <div id="mode-matching" class="mode-container"><div id="matching-container"></div><button class="btn-submit" style="margin-top:20px;" onclick="sendMatching()">Absenden</button></div>
-        <div id="mode-sequence" class="mode-container"><div id="sequence-container"></div><button class="btn-submit" style="margin-top:20px;" onclick="sendSequence()">Bestätigen</button></div>
+        <div id="mode-matching" class="mode-container">
+            <div id="matching-container"></div>
+            <button class="btn-submit" onclick="sendMatching()" style="width:100%; max-width:100%; margin-top: 10px;">Zuordnung Absenden</button>
+        </div>
+
+        <div id="mode-sequence" class="mode-container">
+            <div id="sequence-container"></div>
+            <button class="btn-submit" onclick="sendSequence()" style="width:100%; max-width:100%; margin-top: 10px;">Reihenfolge Bestätigen</button>
+        </div>
+        
         <div id="mode-estimate" class="mode-container">
-            <div class="est-wrapper"><input type="number" id="est-val" class="est-input"><input type="range" id="est-slide" class="est-range" oninput="syncEst(this.value)"></div>
-            <button class="btn-submit" style="margin-top:30px;" onclick="sendEstimate()">Schätzen</button></div>
+            <div class="est-wrapper">
+                <input type="number" id="est-val" class="est-input" readonly>
+                <input type="range" id="est-slide" class="est-range" oninput="syncEst(this.value)">
+                <p style="margin:0; color:#666; font-size:0.8rem;">Schiebe den Regler</p>
+            </div>
+            <button class="btn-submit" onclick="sendEstimate()" style="align-self: center;">Wert schätzen</button>
+        </div>
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
@@ -264,7 +285,6 @@
         let localGameId = null; 
         const STORAGE_KEY = `voting_game_auth_${username}`;
         
-        // AUDIO ELEMENTS
         const audioPlayer = document.getElementById('global-audio-player');
         const audioUI = document.getElementById('audio-ui');
         const audioStatus = document.getElementById('audio-state-text');
@@ -275,11 +295,9 @@
             audioPlayer.play().then(() => {
                 btnEnableAudio.style.display = 'none';
                 audioStatus.innerText = "🔊 Audio bereit";
-                audioStatus.classList.remove('inactive');
             }).catch(e => { console.log("Audio blockiert"); });
         }
 
-        // SIDEBAR TOGGLE
         function toggleSidebar() {
             const sb = document.getElementById('sidebar');
             const ov = document.getElementById('sidebar-overlay');
@@ -290,11 +308,8 @@
             }
         }
         
-        // AUTO OPEN SIDEBAR ON DESKTOP
         window.addEventListener('load', () => {
-            if (window.innerWidth >= 768) {
-                toggleSidebar();
-            }
+            if (window.innerWidth >= 768) { toggleSidebar(); }
         });
 
         socket.on('connect', () => { 
@@ -315,7 +330,7 @@
                 });
                 if (Math.abs(audioPlayer.currentTime - cmd.currentTime) > 0.5) audioPlayer.currentTime = cmd.currentTime;
             } 
-            else if (cmd.action === 'pause') { audioPlayer.pause(); audioStatus.innerText = "⏸️ Pausiert (GM)"; }
+            else if (cmd.action === 'pause') { audioPlayer.pause(); audioStatus.innerText = "⏸️ Pausiert"; }
             else if (cmd.action === 'seek') { audioPlayer.currentTime = cmd.currentTime; }
         });
 
@@ -323,7 +338,6 @@
         socket.on('player_login_success', () => { document.getElementById('login-overlay').style.display = 'none'; const inputCode = document.getElementById('player-code').value; if (inputCode) localStorage.setItem(STORAGE_KEY, inputCode); });
         socket.on('player_login_fail', (msg) => { document.getElementById('login-msg').innerText = msg || "Falscher Code"; localStorage.removeItem(STORAGE_KEY); document.getElementById('login-overlay').style.display = 'flex'; });
         
-        // GAME STATE UPDATE
         socket.on('update_game_state', (data) => {
             if (localGameId && localGameId !== data.gameId) { localStorage.removeItem(STORAGE_KEY); localGameId = data.gameId; document.getElementById('login-overlay').style.display = 'flex'; document.getElementById('player-code').value = ''; document.getElementById('login-msg').innerText = "Neues Spiel gestartet!"; socket.emit('player_announce', username); return; }
             localGameId = data.gameId;
@@ -332,7 +346,6 @@
             if (!me && document.getElementById('login-overlay').style.display === 'none') { socket.emit('player_announce', username); return; }
             if (document.getElementById('login-overlay').style.display !== 'none') return;
             
-            // ELIMINATED CHECK
             if (me && me.lives <= 0) {
                 hideAllModes();
                 document.getElementById('eliminated-screen').classList.add('visible');
@@ -344,7 +357,6 @@
                 document.getElementById('eliminated-screen').classList.remove('visible');
             }
 
-            // --- SPECTATOR CHECK (STECHEN) ---
             const isSpectator = round.targetPlayers && round.targetPlayers.length > 0 && !round.targetPlayers.includes(username);
             if (isSpectator && !round.revealed) { 
                 hideAllModes(); document.getElementById('spectator-screen').classList.add('visible'); document.getElementById('locked-screen').classList.remove('visible'); return; 
@@ -360,23 +372,14 @@
             if (currentSignature !== lastRoundSignature) { lastRoundSignature = currentSignature; switchMode(round.type, round, data.players); } else { if (round.type === 'PLAYER_VOTE') renderPlayerCards(data.players); }
         });
 
-        // --- RENDER SIDEBAR MIT HERZEN ---
         function renderSidebar(players) {
             const list = document.getElementById('sidebar-list'); list.innerHTML = '';
             for (const [name, p] of Object.entries(players)) { 
                 const li = document.createElement('li'); 
-                
-                // Style für Eliminierte
                 if (p.lives <= 0) li.classList.add('eliminated');
                 li.className = p.lives <= 0 ? 'p-item eliminated' : 'p-item';
-
-                // Herzen String bauen
                 let hearts = "";
-                if(p.lives <= 0) hearts = "❌";
-                else {
-                    for(let i=0; i<p.lives; i++) hearts += "❤️ ";
-                }
-
+                if(p.lives <= 0) hearts = "❌"; else { for(let i=0; i<p.lives; i++) hearts += "❤️ "; }
                 li.innerHTML = `
                     <div class="p-name">${name}</div>
                     <div class="p-status">
@@ -393,7 +396,6 @@
             hideAllModes(); 
             document.getElementById('display-question').innerText = roundData.question || "Pause";
             
-            // AUDIO
             const audioDiv = document.getElementById('audio-container');
             if (roundData.audioData) {
                 audioUI.style.display = 'block';
@@ -408,7 +410,6 @@
                 audioUI.style.display = 'none'; audioPlayer.pause(); audioPlayer.src = ""; audioPlayer.removeAttribute('data-src');
             }
 
-            // IMAGE
             const imageDiv = document.getElementById('image-container');
             if (roundData.imageData) {
                 imageDiv.style.display = 'block';
@@ -423,8 +424,8 @@
                 renderResultsTable(allPlayers, roundData);
             } else if (type === 'MC') {
                 document.getElementById('mode-mc').classList.add('active'); const cont = document.getElementById('mc-container'); cont.innerHTML = '';
-                const colors = ['#e74c3c', '#f1c40f', '#2ecc71', '#3498db', '#9b59b6'];
-                roundData.options.forEach((opt, i) => { const btn = document.createElement('button'); btn.className = 'btn-mc'; btn.innerText = opt; btn.style.background = colors[i % colors.length]; if(i%colors.length === 1) btn.style.color = 'black'; btn.onclick = () => sendAnswer(opt); cont.appendChild(btn); });
+                const colors = ['#e11d48', '#d97706', '#16a34a', '#2563eb', '#7c3aed']; // Modernere Farben
+                roundData.options.forEach((opt, i) => { const btn = document.createElement('button'); btn.className = 'btn-mc'; btn.innerText = opt; btn.style.background = colors[i % colors.length]; btn.onclick = () => sendAnswer(opt); cont.appendChild(btn); });
             } else if (type === 'SEQUENCE') { document.getElementById('mode-sequence').classList.add('active'); renderSequence(roundData.options);
             } else if (type === 'ESTIMATE') { document.getElementById('mode-estimate').classList.add('active'); initEstimate(roundData.min, roundData.max);
             } else if (type === 'MATCHING') { document.getElementById('mode-matching').classList.add('active'); renderMatchingInterface(roundData.pairs, roundData.shuffledRight);
@@ -436,13 +437,13 @@
             const solDiv = document.getElementById('correct-answer-display');
             if (roundData.correctAnswer) {
                 let txt = formatAnswer(roundData.correctAnswer);
-                solDiv.innerHTML = `<div class="correct-answer-card"><strong>🏆 LÖSUNG:</strong><br>${txt}</div>`;
+                solDiv.innerHTML = `<div class="correct-answer-card"><strong>🏆 LÖSUNG</strong><br><span style="font-size:1.2rem;">${txt}</span></div>`;
             } else solDiv.innerHTML = '';
             const cont = document.getElementById('results-container'); cont.innerHTML = '';
             for(const [name, p] of Object.entries(allPlayers)) {
                 if(p.answer) {
                     let ans = formatAnswer(p.answer); let extras = "";
-                    if(roundData.type === 'ESTIMATE' && roundData.correctAnswer) { const diff = Math.abs(Number(p.answer) - Number(roundData.correctAnswer)); extras = `<span style="color:#e74c3c; font-weight:bold;"> (Diff: ${diff})</span>`; }
+                    if(roundData.type === 'ESTIMATE' && roundData.correctAnswer) { const diff = Math.abs(Number(p.answer) - Number(roundData.correctAnswer)); extras = `<span style="color:var(--danger-color); font-weight:bold;"> (Diff: ${diff})</span>`; }
                     cont.innerHTML += `<div class="result-card"><div class="res-name">${name}</div><div class="res-val">${ans} ${extras}</div></div>`;
                 }
             }
@@ -462,7 +463,7 @@
                 const row = document.createElement('div'); row.className = 'match-row';
                 let optionsHTML = '<option value="" disabled selected>-- Wählen --</option>';
                 rightValues.forEach(val => optionsHTML += `<option value="${val}">${val}</option>`);
-                row.innerHTML = `<div class="match-label" data-left="${pair.left}">${pair.left}</div><select class="match-select">${optionsHTML}</select>`;
+                row.innerHTML = `<div class="match-label" data-left="${pair.left}" style="font-weight:bold;">${pair.left}</div><select class="match-select">${optionsHTML}</select>`;
                 container.appendChild(row);
             });
         }
@@ -476,7 +477,9 @@
                     const row = document.createElement('div'); row.className = 'seq-item';
                     const upDisabled = index === 0 ? 'disabled' : '';
                     const downDisabled = index === currentItems.length - 1 ? 'disabled' : '';
-                    row.innerHTML = `<span>${item}</span><div class="seq-controls"><button class="btn-move" onclick="moveSeq(${index}, -1)" ${upDisabled}>▲</button><button class="btn-move" onclick="moveSeq(${index}, 1)" ${downDisabled}>▼</button></div>`;
+                    const opacityUp = index === 0 ? 0.3 : 1;
+                    const opacityDown = index === currentItems.length - 1 ? 0.3 : 1;
+                    row.innerHTML = `<span>${item}</span><div class="seq-controls" style="display:flex; gap:5px;"><button class="btn-move" style="opacity:${opacityUp}" onclick="moveSeq(${index}, -1)" ${upDisabled}>▲</button><button class="btn-move" style="opacity:${opacityDown}" onclick="moveSeq(${index}, 1)" ${downDisabled}>▼</button></div>`;
                     container.appendChild(row);
                 });
             };
@@ -492,10 +495,7 @@
             let count = 0;
             for (const name in players) {
                 if(name === username) continue;
-                // FIX: Entferne die !players[name].isVerified Prüfung, da Server das schon filtert
-                // FIX: Aber filtere lebende Spieler!
                 if(players[name].lives <= 0) continue; 
-                
                 count++;
                 let historyHTML = '';
                 if (!currentHistory || currentHistory.length === 0) {
@@ -503,11 +503,11 @@
                 } else {
                     currentHistory.forEach((roundData, index) => {
                         let ans = formatAnswer(roundData.answers[name]);
-                        historyHTML += `<div class="history-item"><span class="h-q">${index+1}. ${roundData.question}</span><span class="h-a">${ans}</span></div>`;
+                        historyHTML += `<div class="history-item" style="margin-bottom:5px; border-bottom:1px solid #333; padding-bottom:5px;"><span class="h-q" style="display:block; color:#888; font-size:0.8rem;">${index+1}. ${roundData.question}</span><span class="h-a" style="color:var(--accent-color);">${ans}</span></div>`;
                     });
                 }
                 const card = document.createElement('div'); card.className = 'vote-card';
-                card.innerHTML = `<div class="vote-card-header"><div class="vote-name">${name}</div><button class="btn-inspect" onclick="toggleHistory(this)">👁️</button><button class="btn-vote-action" onclick="sendAnswer('${name}')">VOTE</button></div><div class="vote-history">${historyHTML}</div>`;
+                card.innerHTML = `<div class="vote-card-header"><div class="vote-name">${name}</div><div style="display:flex;"><button class="btn-inspect" onclick="toggleHistory(this)">ℹ️</button><button class="btn-vote-action" onclick="sendAnswer('${name}')">WÄHLEN</button></div></div><div class="vote-history">${historyHTML}</div>`;
                 container.appendChild(card);
             }
             if(count === 0) {
@@ -515,7 +515,7 @@
             }
         }
         
-        window.toggleHistory = function(btn) { const h = btn.parentElement.nextElementSibling; if (h.classList.contains('show')) { h.classList.remove('show'); btn.style.background="#444"; } else { h.classList.add('show'); btn.style.background="#555"; } };
+        window.toggleHistory = function(btn) { const h = btn.parentElement.parentElement.nextElementSibling; if (h.classList.contains('show')) { h.classList.remove('show'); btn.style.background="#333"; } else { h.classList.add('show'); btn.style.background="#555"; } };
         function sendAnswer(val) { socket.emit('submit_answer', { user: username, answer: val }); }
         function sendText() { const val = document.getElementById('text-answer').value; if(val.trim()) sendAnswer(val); }
         function sendEstimate() { const val = document.getElementById('est-val').value; if(val!=='') sendAnswer(Number(val)); }
