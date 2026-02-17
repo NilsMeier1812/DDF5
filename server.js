@@ -238,16 +238,17 @@ io.on('connection', (socket) => {
                 lives: 3, hasAnswered: false, answer: null, connected: false
             };
             saveGame();
-            // Bestätigung an GM (damit das Popup kommt)
             socket.emit('gm_player_joined', { name, code, isManual: true });
             broadcastStatus();
         }
     });
 
-    // 2. Automatisch durch URL Aufruf
+    // 2. Automatisch durch URL Aufruf (WICHTIG: Hier fehlte die Benachrichtigung)
     socket.on('player_announce', (name) => {
         let isNew = false;
+        
         if (!players[name]) {
+            // Spieler existiert noch nicht -> Neu anlegen
             players[name] = { 
                 code: Math.floor(1000 + Math.random() * 9000).toString(),
                 lives: 3, hasAnswered: false, answer: null, connected: true
@@ -258,8 +259,8 @@ io.on('connection', (socket) => {
             players[name].connected = true;
         }
         
-        // Benachrichtigung an GM, wenn NEUER Spieler
-        if(isNew) {
+        // Benachrichtigung an GM senden, wenn es ein neuer Spieler ist
+        if (isNew) {
             io.to('gamemaster_room').emit('gm_player_joined', { name, code: players[name].code, isManual: false });
         }
         
