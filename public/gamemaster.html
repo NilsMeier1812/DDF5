@@ -32,9 +32,12 @@
         .content { flex: 1; padding: 30px; display: flex; flex-direction: column; overflow-y: auto; }
         .top-bar { display: flex; justify-content: space-between; margin-bottom: 20px; align-items: center; }
         
+        /* TOP BUTTONS */
         .btn-new-q { background: #3498db; color: white; padding: 12px 25px; border: none; border-radius: 5px; font-size: 1.1rem; cursor: pointer; font-weight: bold; }
         .btn-close-vote { background: #e67e22; color: white; padding: 12px 25px; border: none; border-radius: 5px; font-size: 1.1rem; cursor: pointer; font-weight: bold; margin-right: 10px; }
         .btn-reveal { background: #f1c40f; color: #222; padding: 12px 25px; border: none; border-radius: 5px; font-size: 1.1rem; cursor: pointer; font-weight: bold; margin-right: 10px;}
+        .btn-finish-round { background: #8e44ad; color: white; padding: 12px 25px; border: none; border-radius: 5px; font-size: 1.1rem; cursor: pointer; font-weight: bold; margin-right: 10px; display: flex; align-items: center; gap: 5px; }
+        .btn-finish-round:hover { background: #9b59b6; }
 
         .current-question { background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; border-left: 5px solid #3498db; display: flex; justify-content: space-between; align-items: center;}
         .answers-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 15px; }
@@ -49,16 +52,22 @@
         dialog::backdrop { background: rgba(0,0,0,0.5); }
         .modal-header { background: #f8f9fa; padding: 15px 20px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
         .modal-body { padding: 20px; display: flex; flex-direction: column; gap: 15px; max-height: 70vh; overflow-y: auto; }
-        .modal-footer { padding: 15px 20px; border-top: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;}
+        .modal-footer { padding: 15px 20px; border-top: 1px solid #eee; text-align: right; }
         
         input, select { padding: 10px; width: 100%; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
-        .dynamic-row { display: flex; gap: 10px; margin-bottom: 5px; }
-        .dynamic-row input { flex: 1; }
+        
+        /* DYNAMIC & CORRECT ANSWER INPUTS */
+        .dynamic-row { display: flex; gap: 10px; margin-bottom: 5px; align-items: center; }
+        .dynamic-row input[type="text"] { flex: 1; }
+        .radio-correct { width: 25px; height: 25px; cursor: pointer; accent-color: #2ecc71; }
+        
+        .correct-answer-section { border-top: 1px solid #eee; padding-top: 15px; margin-top: 10px; }
+        .correct-label { display: block; font-weight: bold; color: #27ae60; margin-bottom: 5px; }
+
         .btn-add-opt { background: #eee; border: 1px solid #ccc; padding: 5px 10px; cursor: pointer; width: 100%; border-radius: 4px; margin-top: 5px;}
         .section-label { font-weight: bold; font-size: 0.9rem; margin-top: 10px; display: block; }
 
-        .btn-reset-round { background: #c0392b; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer; font-size: 0.9rem; font-weight: bold;}
-        .btn-cancel { padding: 10px 15px; cursor: pointer; border: 1px solid #ccc; background: #fff; border-radius: 4px; }
+        .btn-cancel { padding: 10px 15px; cursor: pointer; border: 1px solid #ccc; background: #fff; border-radius: 4px; margin-right: 10px;}
         .btn-start { background: #2ecc71; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 1rem;}
         .btn-mini { padding: 2px 8px; cursor: pointer; border: 1px solid #ccc; background: #fff; border-radius: 4px; }
 
@@ -66,6 +75,7 @@
         .player-check-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 5px; margin-top: 5px; }
         .p-check-label { display: flex; align-items: center; gap: 5px; font-size: 0.9rem; cursor: pointer; background: white; padding: 5px; border: 1px solid #eee; border-radius: 4px; }
         .p-check-label input { width: auto; margin: 0; }
+        
         .btn-danger-all { background: #e74c3c; color: white; border: none; padding: 5px 10px; border-radius: 4px; font-size: 0.8rem; cursor: pointer; }
     </style>
 </head>
@@ -98,9 +108,13 @@
         <div class="content">
             <div class="top-bar">
                 <h1>Gamemaster <span id="game-id-display" style="font-size:0.8rem; color:#aaa; font-weight:normal;"></span></h1>
-                <div>
+                <div style="display:flex; align-items:center;">
                     <button id="btn-close-vote" class="btn-close-vote" onclick="closeVote()">🔒 Voting Schließen</button>
                     <button id="btn-reveal" class="btn-reveal" onclick="reveal()">👁️ Auflösen</button>
+                    
+                    <!-- NEU: RUNDE BEENDEN BUTTON -->
+                    <button class="btn-finish-round" onclick="finishRoundPhase()">🏁 Runde beenden</button>
+                    
                     <button class="btn-new-q" onclick="openModal()">+ Nächste Frage</button>
                 </div>
             </div>
@@ -122,7 +136,6 @@
 
     <!-- MODAL -->
     <dialog id="q-modal">
-        <!-- MODAL CONTENT SAME AS BEFORE -->
         <div class="modal-header">
             <strong>Frage konfigurieren</strong>
             <button onclick="closeModal()" style="background:none; border:none; cursor:pointer; font-size:1.5rem;">&times;</button>
@@ -141,6 +154,7 @@
             <label><strong>Frage / Titel:</strong></label>
             <input type="text" id="m-question" placeholder="Fragetext eingeben...">
 
+            <!-- STECHEN OPTION -->
             <div style="margin-top:10px;">
                 <button class="btn-mini" onclick="toggleStechen()">⚔️ Stechen / Zielgruppe einschränken</button>
                 <div id="stechen-area">
@@ -149,14 +163,18 @@
                 </div>
             </div>
 
+            <!-- DYNAMISCHER BEREICH -->
             <div id="dynamic-area"></div>
+            
+            <!-- LÖSUNG (Dynamisch gefüllt) -->
+            <div id="solution-area" class="correct-answer-section" style="display:none;">
+                <label class="correct-label">💡 Musterlösung (wird beim Auflösen angezeigt):</label>
+                <input type="text" id="m-correct-text" placeholder="Richtige Antwort eingeben...">
+            </div>
         </div>
         <div class="modal-footer">
-            <button class="btn-reset-round" onclick="startRound(true)">⚠️ Neue Spielrunde</button>
-            <div style="display:flex; gap:10px;">
-                <button class="btn-cancel" onclick="closeModal()">Abbrechen</button>
-                <button class="btn-start" onclick="startRound(false)">Starten</button>
-            </div>
+            <button class="btn-cancel" onclick="closeModal()">Abbrechen</button>
+            <button class="btn-start" onclick="startQuestion()">Frage Starten</button>
         </div>
     </dialog>
 
@@ -171,77 +189,76 @@
             document.getElementById('main-ui').style.display = 'flex';
         });
 
-        // TOAST Notification für neue Spieler
         socket.on('gm_player_joined', (data) => {
             const container = document.getElementById('notification-area');
             const toast = document.createElement('div');
             toast.className = 'toast';
-            toast.innerHTML = `
-                <div>
-                    <strong>Neuer Spieler: ${data.name}</strong>
-                    <small>${data.isManual ? 'Manuell erstellt' : 'Beigetreten'}</small>
-                </div>
-                <div class="toast-code">${data.code}</div>
-            `;
+            toast.innerHTML = `<div><strong>${data.name}</strong><small>${data.isManual?'Manuell':'Beitritt'}</small></div><div class="toast-code">${data.code}</div>`;
             container.appendChild(toast);
-            setTimeout(() => { 
-                toast.style.opacity = '0';
-                setTimeout(() => toast.remove(), 300);
-            }, 10000);
+            setTimeout(() => toast.remove(), 10000);
         });
 
         function manualAddPlayer() {
-            const name = prompt("Name des Spielers eingeben:");
-            if(name) socket.emit('gm_create_player', name);
+            const name = prompt("Name:"); if(name) socket.emit('gm_create_player', name);
         }
 
+        // --- RUNDEN LOGIK ---
+        function finishRoundPhase() {
+            if(confirm("🏁 Runde wirklich beenden?\n\n- Archiviert alle Fragen der aktuellen Phase\n- Leert die History\n- Startet 'Runde X+1'")) {
+                socket.emit('gm_next_round_phase');
+            }
+        }
+
+        // --- MODAL & FRAGE ---
         const modal = document.getElementById('q-modal');
         function openModal() { updateModalFields(); generateStechenList(); document.getElementById('stechen-area').style.display = 'none'; modal.showModal(); }
         function closeModal() { modal.close(); }
-
-        function toggleStechen() {
-            const area = document.getElementById('stechen-area');
-            area.style.display = area.style.display === 'none' ? 'block' : 'none';
-        }
+        function toggleStechen() { const a=document.getElementById('stechen-area'); a.style.display = a.style.display==='none'?'block':'none'; }
 
         function generateStechenList() {
-            const container = document.getElementById('stechen-list');
-            container.innerHTML = '';
+            const container = document.getElementById('stechen-list'); container.innerHTML = '';
             for (const [name, p] of Object.entries(currentPlayers)) {
                 if(!p.isVerified) continue;
-                const label = document.createElement('label');
-                label.className = 'p-check-label';
-                label.innerHTML = `<input type="checkbox" value="${name}" class="stechen-check" checked> ${name}`;
-                container.appendChild(label);
+                container.innerHTML += `<label class="p-check-label"><input type="checkbox" value="${name}" class="stechen-check" checked> ${name}</label>`;
             }
         }
 
         function updateModalFields() {
             const type = document.getElementById('m-type').value;
             const container = document.getElementById('dynamic-area');
+            const solArea = document.getElementById('solution-area');
             container.innerHTML = '';
+            solArea.style.display = 'none';
 
             if (type === 'MC') {
-                container.innerHTML = `<span class="section-label">Antworten:</span><div id="mc-inputs"></div><button class="btn-add-opt" onclick="addInputRow('mc-inputs', 'Antwort...')">+ Option</button>`;
-                addInputRow('mc-inputs', 'Antwort...'); addInputRow('mc-inputs', 'Antwort...'); addInputRow('mc-inputs', 'Antwort...');
+                container.innerHTML = `<span class="section-label">Antworten (Lösung rechts markieren):</span><div id="mc-inputs"></div><button class="btn-add-opt" onclick="addMCRow()">+ Option</button>`;
+                addMCRow(); addMCRow(); addMCRow(); addMCRow();
+                // Lösung wird über die Radiobuttons erfasst, nicht extra Textfeld
             } 
             else if (type === 'SEQUENCE') {
-                container.innerHTML = `<span class="section-label">Korrekte Reihenfolge (Oben = 1.):</span><div id="seq-inputs"></div><button class="btn-add-opt" onclick="addInputRow('seq-inputs', 'Element...')">+ Element</button>`;
-                addInputRow('seq-inputs', 'Element...'); addInputRow('seq-inputs', 'Element...'); addInputRow('seq-inputs', 'Element...');
+                container.innerHTML = `<span class="section-label">Korrekte Reihenfolge eingeben (wird gemischt):</span><div id="seq-inputs"></div><button class="btn-add-opt" onclick="addInputRow('seq-inputs', 'Element...')">+ Element</button>`;
+                addInputRow('seq-inputs', 'Element...'); addInputRow('seq-inputs', 'Element...');
+                // Lösung ist implizit die Eingabe
             }
-            else if (type === 'ESTIMATE') {
-                container.innerHTML = `
-                    <span class="section-label">Bereich festlegen:</span>
-                    <div class="dynamic-row">
-                        <input type="number" id="est-min" placeholder="Min (z.B. 0)">
-                        <input type="number" id="est-max" placeholder="Max (z.B. 2024)">
-                    </div>
-                `;
+            else if (type === 'ESTIMATE' || type === 'TEXT') {
+                if(type === 'ESTIMATE') {
+                    container.innerHTML = `<span class="section-label">Bereich:</span><div class="dynamic-row"><input type="number" id="est-min" placeholder="Min"><input type="number" id="est-max" placeholder="Max"></div>`;
+                }
+                solArea.style.display = 'block'; // Extra Feld für Lösung
+                document.getElementById('m-correct-text').placeholder = type==='ESTIMATE' ? "Exakte Zahl (Lösung)" : "Musterlösung (Text)";
             }
             else if (type === 'MATCHING') {
-                container.innerHTML = `<span class="section-label">Paare (Links -> Rechts):</span><div id="match-inputs"></div><button class="btn-add-opt" onclick="addMatchPair()">+ Paar</button>`;
+                container.innerHTML = `<span class="section-label">Korrekte Paare (Links -> Rechts):</span><div id="match-inputs"></div><button class="btn-add-opt" onclick="addMatchPair()">+ Paar</button>`;
                 addMatchPair(); addMatchPair();
+                // Lösung ist implizit
             }
+        }
+
+        function addMCRow() {
+            const div = document.createElement('div');
+            div.className = 'dynamic-row';
+            div.innerHTML = `<input type="text" class="dyn-inp mc-text" placeholder="Antwort..."><input type="radio" name="mc_correct" class="radio-correct" title="Ist richtige Antwort">`;
+            document.getElementById('mc-inputs').appendChild(div);
         }
 
         function addInputRow(parentId, placeholder) {
@@ -258,42 +275,73 @@
             document.getElementById('match-inputs').appendChild(div);
         }
 
-        function startRound(isNewGameRound) {
+        function startQuestion() {
             const type = document.getElementById('m-type').value;
             const text = document.getElementById('m-question').value;
             let qText = text;
+            
             let options = []; let pairs = []; let min = 0; let max = 100; let targetPlayers = [];
+            let correctAnswer = null;
 
+            // Stechen
             if (document.getElementById('stechen-area').style.display === 'block') {
                 document.querySelectorAll('.stechen-check').forEach(cb => { if (cb.checked) targetPlayers.push(cb.value); });
                 if (targetPlayers.length === Object.keys(currentPlayers).filter(k=>currentPlayers[k].isVerified).length) targetPlayers = [];
             }
 
-            if (type === 'MC' || type === 'SEQUENCE') {
-                document.querySelectorAll('.dyn-inp').forEach(inp => { if(inp.value.trim()) options.push(inp.value.trim()); });
-                if(options.length < 2) { alert("Mindestens 2 Elemente nötig."); return; }
-                if(!qText) qText = type === 'MC' ? "Wähle aus:" : "Sortiere:";
-            } 
-            else if (type === 'ESTIMATE') {
-                min = document.getElementById('est-min').value; max = document.getElementById('est-max').value;
-                if(min==='' || max==='') { alert("Min/Max angeben!"); return; }
-                if(!qText) qText = `Schätze zwischen ${min} und ${max}:`;
+            // DATEN SAMMELN
+            if (type === 'MC') {
+                const rows = document.querySelectorAll('#mc-inputs .dynamic-row');
+                rows.forEach(row => {
+                    const val = row.querySelector('.mc-text').value.trim();
+                    const isCorrect = row.querySelector('.radio-correct').checked;
+                    if(val) {
+                        options.push(val);
+                        if(isCorrect) correctAnswer = val;
+                    }
+                });
+                if(options.length < 2) { alert("Min 2 Optionen"); return; }
+                if(!qText) qText = "Wähle aus:";
+            }
+            else if (type === 'SEQUENCE') {
+                document.querySelectorAll('#seq-inputs .dyn-inp').forEach(inp => { if(inp.value.trim()) options.push(inp.value.trim()); });
+                if(options.length < 2) { alert("Min 2 Elemente"); return; }
+                if(!qText) qText = "Sortiere:";
+                correctAnswer = [...options]; // Die Eingabe IST die richtige Lösung
             }
             else if (type === 'MATCHING') {
                 const lefts = document.querySelectorAll('.match-l'); const rights = document.querySelectorAll('.match-r');
-                for(let i=0; i<lefts.length; i++) if(lefts[i].value.trim()) pairs.push({ left: lefts[i].value.trim(), right: rights[i].value.trim() });
-                if(pairs.length < 2) { alert("Mindestens 2 Paare."); return; }
+                let pairObj = {};
+                for(let i=0; i<lefts.length; i++) {
+                    if(lefts[i].value.trim()) {
+                        pairs.push({ left: lefts[i].value.trim(), right: rights[i].value.trim() });
+                        pairObj[lefts[i].value.trim()] = rights[i].value.trim();
+                    }
+                }
+                if(pairs.length < 2) { alert("Min 2 Paare"); return; }
                 if(!qText) qText = "Ordne zu:";
+                correctAnswer = pairObj; // Map als Lösung
+            }
+            else if (type === 'ESTIMATE' || type === 'TEXT') {
+                if(type === 'ESTIMATE') {
+                    min = document.getElementById('est-min').value; max = document.getElementById('est-max').value;
+                    if(min==='' || max==='') { alert("Min/Max!"); return; }
+                    if(!qText) qText = `Schätze ${min}-${max}:`;
+                }
+                const enteredSol = document.getElementById('m-correct-text').value;
+                if(enteredSol) correctAnswer = enteredSol;
             }
             else if (type === 'PLAYER_VOTE' && !qText) qText = 'Wer verliert ein Leben?';
 
-            if(isNewGameRound && !confirm("Runde beenden & Archivieren?")) return;
-
-            socket.emit('gm_start_round', { type, question: qText, options, pairs, min, max, targetPlayers, isNewGameRound });
+            socket.emit('gm_start_round', { 
+                type, question: qText, options, pairs, min, max, targetPlayers, correctAnswer
+            });
             closeModal();
             document.getElementById('m-question').value = '';
+            document.getElementById('m-correct-text').value = '';
         }
 
+        // --- STEUERUNG ---
         function closeVote() { socket.emit('gm_close_answering'); }
         function reveal() { socket.emit('gm_reveal'); }
         function resetAll() { if(confirm("🚨 ALLES LÖSCHEN?")) socket.emit('gm_reset_all'); }
@@ -308,71 +356,58 @@
         function renderSidebar(players) {
             const list = document.getElementById('sidebar-list');
             list.innerHTML = '';
-            
-            const active = [];
-            const pending = [];
-
-            for (const [name, p] of Object.entries(players)) {
-                if(p.isVerified) active.push({name, ...p});
-                else pending.push({name, ...p});
-            }
+            const active = []; const pending = [];
+            for (const [name, p] of Object.entries(players)) { if(p.isVerified) active.push({name, ...p}); else pending.push({name, ...p}); }
 
             active.forEach(p => {
-                const row = document.createElement('div');
-                row.className = 'player-row';
+                const row = document.createElement('div'); row.className = 'player-row';
                 const dotClass = p.hasAnswered ? 'status-dot active' : 'status-dot';
-                row.innerHTML = `
-                    <div style="display:flex; align-items:center;">
-                        <span class="${dotClass}"></span>
-                        <div><div class="player-name">${p.name}</div><span class="player-code">${p.code}</span></div>
-                    </div>
-                    <div class="lives-control">
-                        <button class="btn-mini" onclick="modLife('${p.name}', -1)">-</button>
-                        <span style="min-width:30px; text-align:center;">${p.lives}❤️</span>
-                        <button class="btn-mini" onclick="modLife('${p.name}', 1)">+</button>
-                    </div>`;
+                row.innerHTML = `<div style="display:flex; align-items:center;"><span class="${dotClass}"></span><div><div class="player-name">${p.name}</div><span class="player-code">${p.code}</span></div></div>
+                    <div class="lives-control"><button class="btn-mini" onclick="modLife('${p.name}', -1)">-</button><span>${p.lives}❤️</span><button class="btn-mini" onclick="modLife('${p.name}', 1)">+</button></div>`;
                 list.appendChild(row);
             });
-
             if (pending.length > 0) {
-                const header = document.createElement('div');
-                header.className = 'pending-header';
-                header.innerText = "Beitrittsanfragen";
-                list.appendChild(header);
-
-                pending.forEach(p => {
-                    const row = document.createElement('div');
-                    row.className = 'pending-row';
-                    row.innerHTML = `
-                        <div><div style="font-weight:bold;">${p.name}</div><div style="font-size:0.8rem; color:#888;">Wartet auf Code...</div></div>
-                        <div class="pending-code">${p.code}</div>
-                    `;
-                    list.appendChild(row);
-                });
+                list.innerHTML += `<div class="pending-header">Beitrittsanfragen</div>`;
+                pending.forEach(p => list.innerHTML += `<div class="pending-row"><div><strong>${p.name}</strong></div><div class="pending-code">${p.code}</div></div>`);
             }
         }
 
         function renderMainArea(round, players) {
             const btnClose = document.getElementById('btn-close-vote');
             const btnReveal = document.getElementById('btn-reveal');
-
-            if (round.type === 'WAITING') {
+            
+            // Sichtbarkeit steuern
+            if (round.type === 'WAITING' || round.revealed) {
                 btnClose.style.display = 'none'; btnReveal.style.display = 'none';
             } else if (round.answeringOpen) {
                 btnClose.style.display = 'inline-block'; btnReveal.style.display = 'none';
-            } else if (!round.revealed) {
-                btnClose.style.display = 'none'; btnReveal.style.display = 'inline-block';
             } else {
-                btnClose.style.display = 'none'; btnReveal.style.display = 'none';
+                btnClose.style.display = 'none'; btnReveal.style.display = 'inline-block';
             }
 
-            let qInfo = round.question || "Pause";
-            if (round.targetPlayers && round.targetPlayers.length > 0) qInfo += ` <span style="color:#e74c3c; font-size:0.8rem;">(Nur: ${round.targetPlayers.join(', ')})</span>`;
+            let qInfo = round.question || "Warte auf Start...";
+            if (round.targetPlayers && round.targetPlayers.length > 0) qInfo += ` <span style="color:#e74c3c;">(Nur: ${round.targetPlayers.join(', ')})</span>`;
             document.getElementById('q-text').innerHTML = qInfo;
             document.getElementById('q-type').innerText = round.type;
 
             const grid = document.getElementById('answers-area');
             grid.innerHTML = '';
+
+            // Wenn RUNDE VORBEI oder REVEALED -> Zeige Lösung ganz oben
+            if (round.revealed && round.correctAnswer) {
+                let solText = JSON.stringify(round.correctAnswer);
+                if (typeof round.correctAnswer === 'string' || typeof round.correctAnswer === 'number') solText = round.correctAnswer;
+                else if (Array.isArray(round.correctAnswer)) solText = round.correctAnswer.join(" → ");
+                else if (typeof round.correctAnswer === 'object') {
+                    solText = ""; for(const[k,v] of Object.entries(round.correctAnswer)) solText += `${k}=${v}, `;
+                }
+
+                grid.innerHTML += `
+                    <div style="grid-column: 1/-1; background:#d4edda; color:#155724; padding:15px; border-radius:8px; border:1px solid #c3e6cb; margin-bottom:10px;">
+                        <strong>🏆 RICHTIGE ANTWORT:</strong> <span style="font-size:1.2rem; font-weight:bold;">${solText}</span>
+                    </div>
+                `;
+            }
 
             let count = 0;
             for (const [name, p] of Object.entries(players)) {
@@ -384,21 +419,18 @@
                     let displayAnswer = p.answer;
                     
                     if (round.type === 'MATCHING' && typeof p.answer === 'object') {
-                        displayAnswer = '<ul style="margin:0; padding-left:20px; font-size:0.9rem;">';
+                        displayAnswer = '<ul style="margin:0; padding-left:20px;">';
                         for(const [k, v] of Object.entries(p.answer)) displayAnswer += `<li>${k} ➝ <b>${v}</b></li>`;
                         displayAnswer += '</ul>';
-                    }
-                    else if (round.type === 'SEQUENCE' && Array.isArray(p.answer)) {
-                        displayAnswer = '<ol style="margin:0; padding-left:20px; font-size:0.9rem;">';
-                        p.answer.forEach(itm => displayAnswer += `<li>${itm}</li>`);
-                        displayAnswer += '</ol>';
+                    } else if (Array.isArray(p.answer)) {
+                        displayAnswer = p.answer.join(" → ");
                     }
 
                     if (round.type === 'PLAYER_VOTE') {
                         card.style.borderLeft = "5px solid #e74c3c";
                         card.innerHTML = `<strong>${name} wählt:</strong><div style="font-size:1.5rem">${p.answer}</div>`;
                     } else {
-                        card.innerHTML = `<strong>${name}</strong><div style="font-size:1.1rem; color:#3498db; margin-top:5px;">${displayAnswer}</div>`;
+                        card.innerHTML = `<strong>${name}</strong><div style="font-size:1.1rem; color:#3498db;">${displayAnswer}</div>`;
                     }
                     grid.appendChild(card);
                 }
