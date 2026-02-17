@@ -58,9 +58,9 @@
         .answer-counter strong { font-size: 2rem; display: block; color: var(--primary); line-height: 1; }
         .answer-counter span { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600; }
         .answers-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 15px; }
-        .answer-card { background: var(--card-bg); padding: 15px; border-radius: 10px; border: 1px solid var(--border); box-shadow: 0 1px 3px rgba(0,0,0,0.05); transition: transform 0.2s; }
+        .answer-card { background: var(--card-bg); padding: 15px; border-radius: 10px; border: 1px solid var(--border); box-shadow: 0 1px 3px rgba(0,0,0,0.05); transition: transform 0.2s; word-wrap: break-word; }
         .answer-card strong { display: block; font-size: 0.9rem; color: var(--text-muted); margin-bottom: 5px; }
-        .answer-card div { font-size: 1.1rem; font-weight: 600; color: var(--text-main); word-wrap: break-word; }
+        .answer-card div { font-size: 1.1rem; font-weight: 600; color: var(--text-main); }
         dialog { border: none; border-radius: 12px; padding: 0; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04); width: 600px; max-width: 95%; background: var(--card-bg); }
         dialog::backdrop { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); }
         .modal-header { padding: 20px 25px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: #f8fafc; }
@@ -87,14 +87,31 @@
     </style>
 </head>
 <body>
-    <div id="login-overlay"><div class="login-box"><h2 style="margin-top:0; color:var(--text-main);">🔒 GM Login</h2><input type="password" id="gm-password" placeholder="Passwort eingeben" style="text-align:center; font-size:1.2rem; letter-spacing:2px;" onkeyup="if(event.key === 'Enter') login()"><br><br><button class="btn-primary" style="width:100%; padding:12px;" onclick="login()">Dashboard öffnen</button><p id="login-msg" class="login-error" style="color:var(--danger); display:none; margin-top:15px;">Falsches Passwort!</p></div></div>
+
+    <div id="login-overlay">
+        <div class="login-box">
+            <h2 style="margin-top:0; color:var(--text-main);">🔒 GM Login</h2>
+            <input type="password" id="gm-password" placeholder="Passwort eingeben" style="text-align:center; font-size:1.2rem; letter-spacing:2px;" onkeyup="if(event.key === 'Enter') login()">
+            <br><br>
+            <button class="btn-primary" style="width:100%; padding:12px;" onclick="login()">Dashboard öffnen</button>
+            <p id="login-msg" class="login-error" style="color:var(--danger); display:none; margin-top:15px;">Falsches Passwort!</p>
+        </div>
+    </div>
+
     <div id="notification-area"></div>
+
     <div id="main-ui">
         <div class="sidebar">
-            <div class="sidebar-header">TEILNEHMER<button class="btn-icon" onclick="resetAll()" title="Alles zurücksetzen" style="color:var(--danger); border-color:var(--danger);">✕</button></div>
+            <div class="sidebar-header">
+                TEILNEHMER
+                <button class="btn-icon" onclick="resetAll()" title="Alles zurücksetzen" style="color:var(--danger); border-color:var(--danger);">✕</button>
+            </div>
             <div id="sidebar-list" class="sidebar-content"></div>
-            <div class="sidebar-footer"><button class="btn-small" onclick="manualAddPlayer()">+ Spieler manuell hinzufügen</button></div>
+            <div class="sidebar-footer">
+                <button class="btn-small" onclick="manualAddPlayer()">+ Spieler manuell hinzufügen</button>
+            </div>
         </div>
+
         <div class="content">
             <div class="top-bar">
                 <h1>Gamemaster <span id="game-id-display" style="font-size:0.8rem; font-weight:400; color:var(--text-muted); margin-left:10px;"></span></h1>
@@ -105,20 +122,37 @@
                     <button class="btn-primary" onclick="openModal()">+ Neue Frage</button>
                 </div>
             </div>
+
             <div class="current-question">
                 <div style="flex:1;">
-                    <span id="q-type">Warte auf Start...</span><h2 id="q-text" style="margin:10px 0 0 0;">Keine aktive Frage</h2>
-                    <div id="gm-image-wrapper" style="margin-top:15px; display:none;"><img id="gm-image-display" src="" style="max-height:200px; max-width:100%; border-radius:8px; border:1px solid var(--border);"></div>
-                    <div id="gm-audio-wrapper" style="margin-top:15px; display:none;"><audio id="gm-audio-player" controls style="width:100%;"></audio></div>
+                    <span id="q-type">Warte auf Start...</span>
+                    <h2 id="q-text" style="margin:10px 0 0 0;">Keine aktive Frage</h2>
+                    <div id="gm-image-wrapper" style="margin-top:15px; display:none;">
+                        <img id="gm-image-display" src="" style="max-height:200px; max-width:100%; border-radius:8px; border:1px solid var(--border);">
+                    </div>
+                    <div id="gm-audio-wrapper" style="margin-top:15px; display:none;">
+                        <audio id="gm-audio-player" controls style="width:100%;"></audio>
+                    </div>
                 </div>
                 <div class="answer-counter"><strong id="answer-count">0</strong><span>Antworten</span></div>
             </div>
+
             <div class="answers-grid" id="answers-area"></div>
-            <div id="offline-input-area" style="display:none; background:var(--card-bg); padding:25px; border-radius:12px; margin-top:20px; border:1px solid var(--border);"><h3 style="margin-top:0;">📝 Offline Ergebnisse eintragen</h3><div id="offline-player-inputs" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap:15px; margin-bottom:20px;"></div><button class="btn-primary" onclick="saveOfflineResults()">Ergebnisse Speichern</button></div>
+            
+            <div id="offline-input-area" style="display:none; background:var(--card-bg); padding:25px; border-radius:12px; margin-top:20px; border:1px solid var(--border);">
+                <h3 style="margin-top:0;">📝 Offline Ergebnisse eintragen</h3>
+                <div id="offline-player-inputs" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap:15px; margin-bottom:20px;"></div>
+                <button class="btn-primary" onclick="saveOfflineResults()">Ergebnisse Speichern</button>
+            </div>
         </div>
     </div>
+
+    <!-- MODAL -->
     <dialog id="q-modal">
-        <div class="modal-header"><strong>Frage konfigurieren</strong><button class="btn-icon" onclick="closeModal()" style="border:none;">✕</button></div>
+        <div class="modal-header">
+            <strong>Frage konfigurieren</strong>
+            <button class="btn-icon" onclick="closeModal()" style="border:none;">✕</button>
+        </div>
         <div class="modal-body">
             <label>Modus wählen</label>
             <select id="m-type" onchange="updateModalFields()">
@@ -130,26 +164,68 @@
                 <option value="PLAYER_VOTE">Voting: Wer verliert Leben?</option>
                 <option value="OFFLINE_RESULTS">📝 Offline Ergebnisse erfassen</option>
             </select>
-            <label>Fragetext / Titel</label><input type="text" id="m-question" placeholder="z.B. Wie hoch ist der Eiffelturm?">
+
+            <label>Fragetext / Titel</label>
+            <input type="text" id="m-question" placeholder="z.B. Wie hoch ist der Eiffelturm?">
+
+            <!-- MEDIA -->
             <div style="background:#f8fafc; padding:15px; border-radius:8px; border:1px solid var(--border);">
                 <div style="display:flex; gap:10px; margin-bottom:10px;">
-                    <div style="flex:1;"><label style="font-size:0.8rem; color:var(--text-muted);">Audio (URL oder Datei)</label><input type="text" id="m-audio-url" placeholder="https://..." style="margin-bottom:5px;"><input type="file" id="m-audio-file" accept="audio/*" style="font-size:0.8rem;"></div>
-                    <div style="flex:1;"><label style="font-size:0.8rem; color:var(--text-muted);">Bild (URL oder Datei)</label><input type="text" id="m-image-url" placeholder="https://..." style="margin-bottom:5px;"><input type="file" id="m-image-file" accept="image/*" style="font-size:0.8rem;"></div>
+                    <div style="flex:1;">
+                        <label style="font-size:0.8rem; color:var(--text-muted);">Audio (URL oder Datei)</label>
+                        <input type="text" id="m-audio-url" placeholder="https://..." style="margin-bottom:5px;">
+                        <input type="file" id="m-audio-file" accept="audio/*" style="font-size:0.8rem;">
+                    </div>
+                    <div style="flex:1;">
+                        <label style="font-size:0.8rem; color:var(--text-muted);">Bild (URL oder Datei)</label>
+                        <input type="text" id="m-image-url" placeholder="https://..." style="margin-bottom:5px;">
+                        <input type="file" id="m-image-file" accept="image/*" style="font-size:0.8rem;">
+                    </div>
                 </div>
             </div>
-            <div style="display:flex; gap:10px;"><button class="btn-secondary btn-small" onclick="toggleStechen()">⚔️ Zielgruppe einschränken</button><button class="btn-secondary btn-small" onclick="togglePowerVoter()">⚡ Power Voter setzen</button></div>
-            <div id="stechen-area"><small style="display:block; margin-bottom:5px; font-weight:600;">Wer nimmt teil? (Leer = Alle)</small><div class="player-check-grid" id="stechen-list" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap:5px;"></div></div>
-            <div id="powervoter-area"><small style="display:block; margin-bottom:5px; font-weight:600;">Wer hat doppelte Stimme?</small><div class="player-check-grid" id="powervoter-list" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap:5px;"></div></div>
+
+            <!-- SPECIAL OPTIONS WITH IDS -->
+            <div id="options-wrapper" style="display:flex; gap:10px;">
+                <button class="btn-secondary btn-small" onclick="toggleStechen()">⚔️ Zielgruppe einschränken</button>
+                <button id="btn-powervoter" class="btn-secondary btn-small" onclick="togglePowerVoter()">⚡ Power Voter setzen</button>
+            </div>
+            
+            <div id="stechen-area">
+                <small style="display:block; margin-bottom:5px; font-weight:600;">Wer nimmt teil? (Leer = Alle)</small>
+                <div class="player-check-grid" id="stechen-list"></div>
+            </div>
+            
+            <div id="powervoter-area">
+                <small style="display:block; margin-bottom:5px; font-weight:600;">Wer hat doppelte Stimme?</small>
+                <div class="player-check-grid" id="powervoter-list"></div>
+            </div>
+
+            <!-- DYNAMIC INPUTS -->
             <div id="dynamic-area" style="border-top:1px solid var(--border); padding-top:15px;"></div>
-            <div id="solution-area" class="correct-answer-section" style="display:none; border-top:1px solid var(--border); padding-top:15px;"><label class="correct-label" style="color:var(--success);">💡 Musterlösung (für Auflösung)</label><input type="text" id="m-correct-text" placeholder="Richtige Antwort eingeben..."></div>
+            
+            <div id="solution-area" class="correct-answer-section" style="display:none; border-top:1px solid var(--border); padding-top:15px;">
+                <label class="correct-label" style="color:var(--success);">💡 Musterlösung (für Auflösung)</label>
+                <input type="text" id="m-correct-text" placeholder="Richtige Antwort eingeben...">
+            </div>
         </div>
-        <div class="modal-footer"><button class="btn-danger" onclick="startRound(true)" style="margin-right:auto;">⚠️ Neuer Runden-Block</button><div style="display:flex; gap:10px;"><button class="btn-secondary" onclick="closeModal()">Abbrechen</button><button class="btn-primary" onclick="startQuestion()">Frage Senden</button></div></div>
+        <div class="modal-footer">
+            <button class="btn-danger" onclick="startRound(true)" style="margin-right:auto;">⚠️ Neuer Runden-Block</button>
+            <div style="display:flex; gap:10px;">
+                <button class="btn-secondary" onclick="closeModal()">Abbrechen</button>
+                <button class="btn-primary" onclick="startQuestion()">Frage Senden</button>
+            </div>
+        </div>
     </dialog>
+
     <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io();
         let currentPlayers = {}; 
-        function login() { const pw = document.getElementById('gm-password').value; socket.emit('gm_login', pw); }
+
+        function login() { 
+            const pw = document.getElementById('gm-password').value; 
+            socket.emit('gm_login', pw); 
+        }
         socket.on('gm_login_success', () => { document.getElementById('login-overlay').style.display = 'none'; document.getElementById('main-ui').style.display = 'flex'; });
         socket.on('gm_login_fail', () => { document.getElementById('login-msg').style.display = 'block'; });
         socket.on('gm_player_joined', (data) => { const container = document.getElementById('notification-area'); const toast = document.createElement('div'); toast.className = 'toast'; toast.innerHTML = `<div><strong>${data.name}</strong><small>${data.isManual?'Manuell':'Beitritt'}</small></div><div class="toast-code">${data.code}</div>`; container.appendChild(toast); setTimeout(() => toast.remove(), 10000); });
@@ -173,8 +249,18 @@
             const type = document.getElementById('m-type').value;
             const container = document.getElementById('dynamic-area');
             const solArea = document.getElementById('solution-area');
-            const pvWrapper = document.getElementById('powervoter-area').parentElement;
-            container.innerHTML = ''; solArea.style.display = 'none'; pvWrapper.style.display = 'none';
+            const pvBtn = document.getElementById('btn-powervoter');
+            const pvArea = document.getElementById('powervoter-area');
+            
+            container.innerHTML = ''; solArea.style.display = 'none'; 
+            
+            if(type === 'PLAYER_VOTE') {
+                pvBtn.style.display = 'inline-block';
+            } else {
+                pvBtn.style.display = 'none';
+                pvArea.style.display = 'none';
+            }
+
             if (type === 'MC') {
                 container.innerHTML = `<span class="section-label">Antworten:</span><div id="mc-inputs"></div><button class="btn-small" onclick="addMCRow()">+ Option</button>`; addMCRow(); addMCRow(); addMCRow(); addMCRow();
             } else if (type === 'SEQUENCE') {
@@ -184,8 +270,6 @@
                 solArea.style.display = 'block'; document.getElementById('m-correct-text').placeholder = type==='ESTIMATE' ? "Exakte Zahl (Lösung)" : "Musterlösung (Text)";
             } else if (type === 'MATCHING') {
                 container.innerHTML = `<span class="section-label">Paare:</span><div id="match-inputs"></div><button class="btn-small" onclick="addMatchPair()">+ Paar</button>`; addMatchPair(); addMatchPair();
-            } else if (type === 'PLAYER_VOTE') {
-                pvWrapper.style.display = 'flex'; // Fix: Anzeigen für Player Vote
             } else if (type === 'OFFLINE_RESULTS') {
                 container.innerHTML = `<div style="padding:15px; background:#f0fdf4; color:#166534; border:1px solid #bbf7d0; border-radius:8px;">ℹ️ Spieler sehen einen Warte-Screen. Du kannst die Punkte gleich direkt in der Hauptansicht eintragen.</div>`;
             }
@@ -194,9 +278,7 @@
         function addInputRow(parentId, placeholder) { const div = document.createElement('div'); div.className = 'dynamic-row'; div.innerHTML = `<input type="text" class="dyn-inp" placeholder="${placeholder}">`; document.getElementById(parentId).appendChild(div); }
         function addMatchPair() { const div = document.createElement('div'); div.className = 'dynamic-row'; div.innerHTML = `<input type="text" class="match-l" placeholder="Links (z.B. Land)"><input type="text" class="match-r" placeholder="Rechts (z.B. Stadt)">`; document.getElementById('match-inputs').appendChild(div); }
         
-        // --- HAUPTFUNKTION ZUM STARTEN ---
         function startRound(isNewGameRound) {
-            // Dies ist die Weiche für den "Neue Runden-Block" Button
             startQuestion(isNewGameRound);
         }
 
@@ -231,7 +313,6 @@
                 if(!qText) qText = "Offline Ergebnisse";
             }
             
-            // Wenn Neue Spielrunde, fragen wir sicherheitshalber nach, aber führen es dann mit dem Flag aus
             if(isNewGameRound && !confirm("⚠️ Neuer Runden-Block?\n\nHiermit werden alle bisherigen Fragen archiviert und der Zähler (Runde 1, 2...) erhöht.")) return;
 
             socket.emit('gm_start_round', { type, question: qText, options, pairs, min, max, targetPlayers, correctAnswer, audioData, imageData, powerVoter, isNewGameRound });
