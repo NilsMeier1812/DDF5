@@ -7,7 +7,7 @@
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; background: #1a1a1a; color: #e0e0e0; display: flex; height: 100vh; }
         
-        /* SIDEBAR (GAME LIST) */
+        /* SIDEBAR */
         .sidebar { width: 300px; background: #252525; border-right: 1px solid #444; overflow-y: auto; display: flex; flex-direction: column;}
         .sidebar-header { padding: 20px; background: #111; color: #3498db; text-align: center; font-weight: bold; border-bottom: 1px solid #333; }
         .game-item { padding: 15px 20px; border-bottom: 1px solid #333; cursor: pointer; transition: background 0.2s; }
@@ -29,7 +29,7 @@
         
         /* LIVES DISPLAY */
         .lives-bar { display: flex; gap: 15px; padding: 10px 20px; background: #222; overflow-x: auto; border-bottom: 1px solid #333; }
-        .life-badge { background: #444; padding: 5px 10px; border-radius: 15px; font-size: 0.8rem; display: flex; align-items: center; gap: 5px; }
+        .life-badge { background: #444; padding: 5px 10px; border-radius: 15px; font-size: 0.8rem; display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
         .life-dead { opacity: 0.5; text-decoration: line-through; }
         
         /* QUESTIONS LIST */
@@ -41,12 +41,13 @@
         .q-correct { background: #1b4f25; color: #8fd19e; padding: 5px 10px; border-radius: 4px; display: inline-block; margin-bottom: 10px; font-size: 0.9rem;}
         
         /* ANSWERS GRID */
-        .answers-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+        .answers-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; }
         .ans-card { background: #3a3a3a; padding: 10px; border-radius: 5px; }
         .ans-user { font-size: 0.8rem; color: #aaa; font-weight: bold; margin-bottom: 3px; }
-        .ans-val { color: #fff; white-space: pre-wrap; }
+        .ans-val { color: #fff; white-space: pre-wrap; font-size: 0.95rem;}
         
         .loading { text-align: center; color: #666; margin-top: 50px; font-style: italic; }
+        .error-msg { text-align: center; color: #e74c3c; margin-top: 50px; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -69,8 +70,8 @@
     <script>
         const socket = io();
 
-        // 1. Init: Liste anfordern
         socket.on('connect', () => {
+            console.log("Verbunden. Lade Liste...");
             socket.emit('request_gamelist');
         });
 
@@ -86,11 +87,15 @@
             games.forEach((game, index) => {
                 const el = document.createElement('div');
                 el.className = 'game-item';
-                if(index === 0) el.classList.add('active'); // Erstes markieren? Nein, lieber User klicken lassen.
                 
-                const date = new Date(game.date).toLocaleString('de-DE');
+                // Datum sicher formatieren
+                let dateStr = "Unbekannt";
+                try {
+                    dateStr = new Date(game.date).toLocaleString('de-DE');
+                } catch(e) {}
+
                 el.innerHTML = `
-                    <div class="game-date">${date}</div>
+                    <div class="game-date">${dateStr}</div>
                     <div class="game-id">${game.id} • ${game.playersCount} Spieler</div>
                 `;
                 el.onclick = () => loadGame(game.id, el);
@@ -99,24 +104,33 @@
         });
 
         function loadGame(gameId, element) {
-            // UI Active State
             document.querySelectorAll('.game-item').forEach(e => e.classList.remove('active'));
             element.classList.add('active');
             
-            document.getElementById('content-area').innerHTML = '<div class="loading">Lade Daten...</div>';
+            document.getElementById('content-area').innerHTML = '<div class="loading">Lade Daten für ' + gameId + '...</div>';
             
             socket.emit('request_game_details', gameId);
         }
 
         socket.on('receive_game_details', (data) => {
+            console.log("Details empfangen:", data);
             renderGameDetails(data.meta, data.rounds);
+        });
+
+        socket.on('error_details', (msg) => {
+            document.getElementById('content-area').innerHTML = `<div class="error-msg">${msg}</div>`;
         });
 
         function renderGameDetails(meta, rounds) {
             const container = document.getElementById('content-area');
             const players = meta.players || {};
             const pCount = Object.keys(players).length;
-            const dateStr = meta.lastUpdated ? new Date(meta.lastUpdated.toDate()).toLocaleString() : '-';
+            
+            // Datum sicher parsen
+            let dateStr = '-';
+            try {
+                if (meta.lastUpdated) dateStr = new Date(meta.lastUpdated).toLocaleString();
+            } catch (e) { console.error("Datumsfehler:", e); }
 
             let html = `
                 <div class="header">
@@ -126,13 +140,12 @@
             `;
 
             if (!rounds || rounds.length === 0) {
-                html += '<div style="text-align:center; color:#666;">Keine Runden-Daten verfügbar.</div>';
+                html += '<div style="text-align:center; color:#666;">Keine Runden-Daten verfügbar (oder Spiel wurde resettet).</div>';
                 container.innerHTML = html;
                 return;
             }
 
             rounds.forEach(round => {
-                // Lives Header
                 let livesHtml = '';
                 if (round.playerLives) {
                     for (const [name, lives] of Object.entries(round.playerLives)) {
@@ -142,7 +155,6 @@
                     }
                 }
 
-                // Questions
                 let qHtml = '';
                 if (round.questions) {
                     round.questions.forEach((q, qIndex) => {
@@ -167,12 +179,14 @@
                         qHtml += `
                             <div class="q-item">
                                 <div class="q-meta">Frage ${qIndex + 1} • ${q.type || 'TEXT'}</div>
-                                <div class="q-text">${q.question}</div>
+                                <div class="q-text">${q.question || 'Frage ohne Text'}</div>
                                 ${solHtml}
                                 <div class="answers-grid">${answersHtml}</div>
                             </div>
                         `;
                     });
+                } else {
+                    qHtml = '<div style="padding:20px; color:#666;">Keine Fragen in dieser Runde.</div>';
                 }
 
                 html += `
