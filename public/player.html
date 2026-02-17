@@ -52,13 +52,23 @@
         #spectator-screen { text-align: center; padding: 40px; display: none; }
         #spectator-screen.visible { display: block; }
         .correct-answer-card { background: #f1c40f; color: #222; padding: 15px; border-radius: 8px; margin-bottom: 20px; text-align: center; border: 2px solid #f39c12; font-weight: bold; }
+        .audio-wrapper { margin-bottom: 20px; text-align: center; background: rgba(255,255,255,0.05); padding: 10px; border-radius: 10px; }
+        audio { width: 100%; }
+        .image-wrapper { margin-bottom: 20px; text-align: center; }
+        .image-wrapper img { max-width: 100%; max-height: 400px; border-radius: 8px; border: 1px solid #444; }
     </style>
 </head>
 <body>
     <div id="login-overlay"><h2>Hallo <span id="welcome-name"></span></h2><p style="color:#aaa;">Code eingeben:</p><input type="tel" maxlength="4" class="code-input" id="player-code" placeholder="----"><button class="btn-submit" onclick="submitLogin()">Einloggen</button><p id="login-msg" style="color: #e74c3c; margin-top: 10px; font-weight:bold;"></p></div>
     <div class="sidebar"><h3>Leben</h3><ul class="p-list" id="sidebar-list"></ul></div>
     <div class="main-area">
-        <div class="q-header"><div class="round-indicator" id="round-display">Runde 1</div><div class="q-text" id="display-question">Warte...</div></div>
+        <div class="q-header">
+            <div class="round-indicator" id="round-display">Runde 1</div>
+            <!-- MEDIA CONTAINER -->
+            <div id="image-container" class="image-wrapper" style="display:none;"></div>
+            <div id="audio-container" class="audio-wrapper" style="display:none;"></div>
+            <div class="q-text" id="display-question">Warte...</div>
+        </div>
         <div id="status-toast">✅ Gesendet!</div>
         <div id="locked-screen"><div style="font-size:3rem;">🔒</div><h3>Voting beendet</h3></div>
         <div id="spectator-screen"><h2 style="color:#aaa;">Nur Zuschauer</h2></div>
@@ -95,21 +105,36 @@
             if (round.revealed) { document.getElementById('locked-screen').classList.remove('visible'); document.getElementById('status-toast').style.display = 'none'; switchMode('RESULTS', round, data.players); return; }
             if (!round.answeringOpen && round.type !== 'WAITING') { document.getElementById('locked-screen').classList.add('visible'); document.getElementById('status-toast').style.display = 'none'; return; } else { document.getElementById('locked-screen').classList.remove('visible'); }
             if (me && me.hasAnswered) document.getElementById('status-toast').style.display = 'block'; else document.getElementById('status-toast').style.display = 'none';
-            const currentSignature = round.type + "::" + round.question + "::" + JSON.stringify(round.options || []);
+            const currentSignature = round.type + "::" + round.question + "::" + JSON.stringify(round.options || []) + "::" + (round.imageData ? "IMG" : "NOIMG");
             if (currentSignature !== lastRoundSignature) { lastRoundSignature = currentSignature; switchMode(round.type, round, data.players); } else { if (round.type === 'PLAYER_VOTE') renderPlayerCards(data.players); }
         });
 
         function renderSidebar(players) {
             const list = document.getElementById('sidebar-list'); list.innerHTML = '';
-            // Entferne hier den isVerified check für die Sidebar, da offline Spieler evtl. angezeigt werden sollen
-            // Aber der Server sendet eh nur verified an public.
             for (const [name, p] of Object.entries(players)) { 
                 const li = document.createElement('li'); li.className = 'p-item'; li.innerHTML = `<div class="p-name">${name}</div><div class="p-status"><span class="answered-icon ${p.hasAnswered ? 'visible' : ''}"></span><span style="color:#e74c3c">❤️</span> ${p.lives}</div>`; list.appendChild(li); 
             }
         }
         function hideAllModes() { document.querySelectorAll('.mode-container').forEach(el => el.classList.remove('active')); }
         function switchMode(type, roundData, allPlayers) {
-            hideAllModes(); document.getElementById('display-question').innerText = roundData.question || "Pause";
+            hideAllModes(); 
+            document.getElementById('display-question').innerText = roundData.question || "Pause";
+            
+            // AUDIO
+            const audioDiv = document.getElementById('audio-container');
+            if (roundData.audioData) {
+                audioDiv.style.display = 'block';
+                const existingAudio = audioDiv.querySelector('audio');
+                if (!existingAudio || existingAudio.src !== roundData.audioData) audioDiv.innerHTML = `<audio controls autoplay src="${roundData.audioData}"></audio>`;
+            } else { audioDiv.style.display = 'none'; audioDiv.innerHTML = ''; }
+
+            // IMAGE
+            const imageDiv = document.getElementById('image-container');
+            if (roundData.imageData) {
+                imageDiv.style.display = 'block';
+                imageDiv.innerHTML = `<img src="${roundData.imageData}" alt="Frage Bild" style="max-width:100%; max-height:400px; border-radius:10px;">`;
+            } else { imageDiv.style.display = 'none'; imageDiv.innerHTML = ''; }
+
             if (type === 'RESULTS') {
                 document.getElementById('mode-results').classList.add('active');
                 const solDiv = document.getElementById('correct-answer-display');
@@ -213,6 +238,15 @@
             document.querySelectorAll('.match-row').forEach(row => { const l = row.querySelector('.match-label').getAttribute('data-left'); const r = row.querySelector('.match-select').value; if(!r) complete = false; result[l] = r; });
             if(!complete) alert("Bitte alles zuordnen"); else sendAnswer(result);
         }
+        socket.on('audio_sync_command', (cmd) => {
+            const audioDiv = document.getElementById('audio-container');
+            const audio = audioDiv.querySelector('audio');
+            if(!audio) return;
+            const playPromise = (cmd.action === 'play') ? audio.play() : null;
+            if (playPromise !== undefined) playPromise.catch(error => { console.log("Autoplay blocked"); });
+            if (cmd.action === 'pause') audio.pause();
+            if (Math.abs(audio.currentTime - cmd.currentTime) > 0.5) audio.currentTime = cmd.currentTime;
+        });
         socket.on('answer_confirmed', () => { const t = document.getElementById('status-toast'); t.style.display = 'block'; setTimeout(() => t.style.display = 'none', 2000); });
     </script>
 </body>
