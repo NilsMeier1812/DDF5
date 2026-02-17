@@ -31,12 +31,27 @@ const GM_PASSWORD = "admin";
 let currentGameId = "init"; 
 let players = {}; 
 let currentRound = { 
-    type: 'WAITING', question: '', options: [], pairs: [], targetPlayers: [], 
-    min: 0, max: 100, revealed: false, answeringOpen: false, 
-    correctAnswer: null // Neu: Lösung
+    type: 'WAITING', question: '', 
+    options: [], // Gemischte Optionen für Client
+    pairs: [], 
+    shuffledRight: [], // Für Matching: Rechte Seite gemischt
+    targetPlayers: [], 
+    min: 0, max: 100, 
+    revealed: false, answeringOpen: false, 
+    correctAnswer: null // Die echte Lösung (un-gemischt)
 };
 let sessionHistory = [];
 let globalRoundCounter = 1;
+
+// --- HELPERS ---
+function shuffleArray(array) {
+    const arr = [...array]; // Kopie erstellen
+    for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+}
 
 // --- DB HELPER ---
 const getGameDoc = () => db.collection('games').doc(currentGameId);
@@ -101,7 +116,6 @@ io.on('connection', (socket) => {
         const publicPlayers = {};
         for (const [name, data] of Object.entries(players)) {
             if (!data.isVerified) continue;
-            // Antwort nur senden wenn aufgedeckt
             const answerVisible = currentRound.revealed ? data.answer : null;
             publicPlayers[name] = { 
                 lives: data.lives, 
@@ -144,14 +158,9 @@ io.on('connection', (socket) => {
         broadcastState();
     });
 
-    // --- GAME FLOW ---
-
-    // 1. Neue Spielrunde (Archivieren + Reset)
     socket.on('gm_next_round_phase', () => {
-        // Letzte Frage archivieren falls nötig
         archiveCurrentQuestion();
-
-        // Runde in DB archivieren
+        
         const livesSnapshot = {};
         for (const [name, p] of Object.entries(players)) livesSnapshot[name] = p.lives;
 
@@ -162,17 +171,14 @@ io.on('connection', (socket) => {
             questions: sessionHistory
         });
 
-        // Reset für neue Runde
         sessionHistory = [];
         globalRoundCounter++;
         
-        // Status auf Waiting setzen
         currentRound = {
             type: 'WAITING', question: 'Runde beendet.', revealed: false, answeringOpen: false, 
-            options: [], pairs: [], targetPlayers: [], correctAnswer: null 
+            options: [], pairs: [], targetPlayers: [], correctAnswer: null, shuffledRight: []
         };
         
-        // Antworten resetten
         for (let p in players) {
             players[p].hasAnswered = false;
             players[p].answer = null;
@@ -182,19 +188,42 @@ io.on('connection', (socket) => {
         broadcastState();
     });
 
-    // 2. Frage Starten
     socket.on('gm_start_round', (data) => {
-        archiveCurrentQuestion(); // Alte Frage wegpacken
+        archiveCurrentQuestion();
+
+        let roundOptions = data.options || [];
+        let correctAnswer = data.correctAnswer;
+        let shuffledRight = [];
+
+        // SPEZIAL LOGIK FÜR MISCHEN
+        if (data.type === 'MC') {
+            // MC Optionen mischen, aber Text-String Lösung beibehalten
+            roundOptions = shuffleArray(data.options);
+        }
+        else if (data.type === 'SEQUENCE') {
+            // Bei Sequence ist die Eingabe vom GM die korrekte Lösung (Array)
+            correctAnswer = [...data.options]; 
+            // Den Spielern schicken wir eine gemischte Version
+            roundOptions = shuffleArray(data.options);
+        }
+        else if (data.type === 'MATCHING') {
+            // Paare (Links->Rechts) werden getrennt. Links bleibt fest, Rechts wird gemischt.
+            // correctAnswer ist das Objekt {Links: Rechts}
+            // Wir bereiten die gemischte rechte Seite für alle vor
+            const rightSide = data.pairs.map(p => p.right);
+            shuffledRight = shuffleArray(rightSide);
+        }
 
         currentRound = {
             type: data.type,
             question: data.question,
-            options: data.options || [], 
-            pairs: data.pairs || [],
+            options: roundOptions, 
+            pairs: data.pairs || [], 
+            shuffledRight: shuffledRight, // Neu: Gemeinsame Mischung für alle
             targetPlayers: data.targetPlayers || [], 
             min: data.min !== undefined ? Number(data.min) : 0,
             max: data.max !== undefined ? Number(data.max) : 100,
-            correctAnswer: data.correctAnswer, // Die Lösung vom GM
+            correctAnswer: correctAnswer, 
             revealed: false,
             answeringOpen: true 
         };
@@ -227,7 +256,6 @@ io.on('connection', (socket) => {
     socket.on('gm_reveal', () => { currentRound.revealed = true; currentRound.answeringOpen = false; saveGame(); broadcastState(); });
     socket.on('gm_modify_lives', (data) => { if (players[data.user]) { players[data.user].lives += data.amount; saveGame(); broadcastState(); }});
 
-    // --- PLAYER JOINING ---
     socket.on('gm_create_player', (name) => {
         if (!name) return;
         const code = Math.floor(1000 + Math.random() * 9000).toString();
