@@ -114,6 +114,12 @@
             color: white; border: 1px solid #333; border-radius: var(--radius); outline: none; resize: none; 
         }
         textarea:focus { border-color: var(--accent-color); }
+        
+        .list-input {
+            width: 100%; padding: 15px; font-size: 1.1rem; background: var(--card-color);
+            color: white; border: 1px solid #333; border-radius: 8px; outline: none; margin-bottom: 10px;
+        }
+        .list-input:focus { border-color: var(--accent-color); }
 
         /* Voting List */
         .vote-card { background: var(--card-color); border-radius: 12px; padding: 5px; display: flex; flex-direction: column; border: 1px solid #333; }
@@ -162,6 +168,8 @@
 
         /* Audio/Image */
         .image-wrapper img { max-width: 100%; border-radius: 12px; box-shadow: var(--shadow); border: 1px solid #333; max-height: 300px; object-fit: contain; background: black; }
+        .image-hidden-placeholder { width: 100%; padding: 40px; background: #222; border: 1px dashed #444; border-radius: 12px; text-align: center; color: #666; font-weight: bold; }
+        
         .audio-wrapper { width: 100%; background: #222; padding: 15px; border-radius: 12px; display: none; margin-bottom: 15px; border: 1px solid #333; }
         #btn-enable-audio { width: 100%; padding: 10px; background: #ea580c; border: none; color: white; border-radius: 6px; margin-top: 10px; cursor: pointer; }
         
@@ -289,6 +297,11 @@
             <button class="btn-submit" onclick="sendText()" style="width:100%; max-width:100%;">Absenden</button>
         </div>
         
+        <div id="mode-list" class="mode-container">
+            <div id="list-inputs-container"></div>
+            <button class="btn-submit" onclick="sendList()" style="width:100%; max-width:100%; margin-top:10px;">Liste Absenden</button>
+        </div>
+        
         <div id="mode-vote" class="mode-container">
             <p style="text-align:center; color:#aaa; margin-top:0;">Wähle einen Spieler:</p>
             <div id="vote-player-list" style="display: flex; flex-direction: column; gap: 10px;"></div>
@@ -336,8 +349,8 @@
         const audioUI = document.getElementById('audio-ui');
         const audioStatus = document.getElementById('audio-state-text');
         const btnEnableAudio = document.getElementById('btn-enable-audio');
-        const videoContainer = document.getElementById('video-container'); // NEU
-        const videoIframe = document.getElementById('yt-iframe'); // NEU
+        const videoContainer = document.getElementById('video-container'); 
+        const videoIframe = document.getElementById('yt-iframe');
 
         function setVolume(val) { audioPlayer.volume = val; }
         function enableAudio() {
@@ -449,7 +462,7 @@
                 document.getElementById('locked-screen').classList.remove('visible'); 
             }
             
-            const currentSignature = round.type + "::" + round.question + "::" + JSON.stringify(round.options || []) + "::" + (round.imageData ? "IMG" : "NOIMG") + "::" + (round.audioData ? "AUDIO" : "NOAUDIO") + "::" + (round.videoData || "NOVIDEO");
+            const currentSignature = round.type + "::" + round.question + "::" + JSON.stringify(round.options || []) + "::" + (round.imageData ? "IMG" : "NOIMG") + "::" + (round.audioData ? "AUDIO" : "NOAUDIO") + "::" + (round.videoData || "NOVIDEO") + "::" + round.answerCount + "::" + round.imageRevealed;
             if (currentSignature !== lastRoundSignature) { 
                 lastRoundSignature = currentSignature; 
                 switchMode(round.type, round, data.players); 
@@ -556,7 +569,12 @@
             const imageDiv = document.getElementById('image-container');
             if (roundData.imageData) {
                 imageDiv.style.display = 'block';
-                imageDiv.innerHTML = `<img src="${roundData.imageData}" alt="Frage Bild">`;
+                // CHECK IMAGE REVEALED
+                if (roundData.imageRevealed) {
+                    imageDiv.innerHTML = `<img src="${roundData.imageData}" alt="Frage Bild">`;
+                } else {
+                    imageDiv.innerHTML = `<div class="image-hidden-placeholder">👁️ Bild verborgen (Warte auf GM)</div>`;
+                }
             } else { imageDiv.style.display = 'none'; imageDiv.innerHTML = ''; }
             
             // --- VIDEO STREAM ---
@@ -587,6 +605,9 @@
             } else if (type === 'ESTIMATE') { document.getElementById('mode-estimate').classList.add('active'); initEstimate(roundData.min, roundData.max);
             } else if (type === 'MATCHING') { document.getElementById('mode-matching').classList.add('active'); renderMatchingInterface(roundData.pairs, roundData.shuffledRight);
             } else if (type === 'TEXT') { document.getElementById('mode-text').classList.add('active'); document.getElementById('text-answer').value = ''; 
+            } else if (type === 'LIST') { // NEW
+                document.getElementById('mode-list').classList.add('active');
+                renderListInputs(roundData.answerCount);
             } else if (type === 'PLAYER_VOTE') { document.getElementById('mode-vote').classList.add('active'); renderPlayerCards(allPlayers); }
         }
 
@@ -662,7 +683,11 @@
 
         function formatAnswer(val) {
             if (val === null || val === undefined) return '-';
-            if (Array.isArray(val)) return val.join(' → ');
+            if (Array.isArray(val)) {
+                // Check if it's a list answer (no arrows)
+                const isList = val.some(item => typeof item === 'string' && item.includes(' ')); // Heuristic, or simply render as list
+                return `<ul style="margin:0; padding-left:20px; text-align:left;">${val.map(v => `<li>${v}</li>`).join('')}</ul>`;
+            }
             if (typeof val === 'object') { let s = ''; for(const [k,v] of Object.entries(val)) s += `${k} ➝ ${v}\n`; return s; }
             return val;
         }
@@ -677,6 +702,18 @@
                 row.innerHTML = `<div class="match-label" data-left="${pair.left}" style="font-weight:bold;">${pair.left}</div><select class="match-select">${optionsHTML}</select>`;
                 container.appendChild(row);
             });
+        }
+
+        function renderListInputs(count) {
+            const container = document.getElementById('list-inputs-container');
+            container.innerHTML = '';
+            for(let i=0; i<count; i++) {
+                const inp = document.createElement('input');
+                inp.type = 'text';
+                inp.className = 'list-input';
+                inp.placeholder = `Antwort ${i+1}...`;
+                container.appendChild(inp);
+            }
         }
 
         function renderSequence(items) {
@@ -731,6 +768,14 @@
         function sendText() { const val = document.getElementById('text-answer').value; if(val.trim()) sendAnswer(val); }
         function sendEstimate() { const val = document.getElementById('est-val').value; if(val!=='') sendAnswer(Number(val)); }
         function sendSequence() { socket.emit('submit_answer', { user: username, answer: window.getSequenceData() }); }
+        function sendList() { 
+            const inputs = document.querySelectorAll('.list-input');
+            const vals = [];
+            let allFilled = true;
+            inputs.forEach(i => { if(i.value.trim()) vals.push(i.value.trim()); else allFilled = false; });
+            if(!allFilled) { if(!confirm("Nicht alle Felder ausgefüllt. Trotzdem senden?")) return; }
+            sendAnswer(vals);
+        }
         function sendMatching() {
             const result = {}; let complete = true;
             document.querySelectorAll('.match-row').forEach(row => { const l = row.querySelector('.match-label').getAttribute('data-left'); const r = row.querySelector('.match-select').value; if(!r) complete = false; result[l] = r; });
