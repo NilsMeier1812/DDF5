@@ -25,7 +25,7 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server, { 
     cors: { origin: "*" },
-    maxHttpBufferSize: 1e7 
+    maxHttpBufferSize: 1e7 // 10 MB Limit
 });
 
 const GM_PASSWORD = "admin"; 
@@ -33,6 +33,7 @@ const GM_PASSWORD = "admin";
 // --- GAME STATE ---
 let currentGameId = "init"; 
 let players = {}; 
+
 const DEFAULT_ROUND = { 
     type: 'WAITING', question: '', 
     options: [], pairs: [], shuffledRight: [], targetPlayers: [], 
@@ -43,12 +44,14 @@ const DEFAULT_ROUND = {
     imageData: null,
     powerVoter: []
 };
+
 let currentRound = { ...DEFAULT_ROUND };
 let sessionHistory = [];
 let globalRoundCounter = 1;
 
 // --- HELPERS ---
 function shuffleArray(array) {
+    if(!array) return [];
     const arr = [...array];
     for (let i = arr.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
@@ -72,7 +75,7 @@ async function initServer() {
             await startNewGameInternal();
         }
     } catch (e) {
-        console.error("Fehler beim Server-Start:", e);
+        console.error("Server Start Fehler:", e);
         await startNewGameInternal();
     }
 }
@@ -96,10 +99,12 @@ async function loadGameData() {
             const data = doc.data();
             players = data.players || {};
             
+            // Runde wiederherstellen
             const loadedRound = data.currentRound || {};
             currentRound = { 
                 ...DEFAULT_ROUND, 
                 ...loadedRound, 
+                // RAM-Daten nicht laden, da nicht gespeichert
                 audioData: null, 
                 imageData: null,
                 powerVoter: loadedRound.powerVoter || []
@@ -114,11 +119,12 @@ async function loadGameData() {
             saveGame();
         }
     } catch (e) {
-        console.error("Fehler beim Laden:", e);
+        console.error("Lade-Fehler:", e);
     }
 }
 
 function saveGame() {
+    // Kopie ohne RAM-Daten erstellen
     const roundToSave = { ...currentRound };
     delete roundToSave.audioData; 
     delete roundToSave.imageData; 
@@ -135,7 +141,6 @@ function saveGame() {
 
 initServer();
 
-// --- ROUTING ---
 app.use(express.static('public'));
 app.get('/', (req, res) => res.send(`Server Online. Game: ${currentGameId}`));
 app.get('/gm', (req, res) => res.sendFile(path.join(__dirname, 'public', 'gamemaster.html')));
@@ -145,18 +150,22 @@ app.get('/stats', (req, res) => res.sendFile(path.join(__dirname, 'public', 'ana
 
 io.on('connection', (socket) => {
     
-    // --- GAME LOGIK ---
     const broadcastState = () => {
         try {
+            // 1. Daten für Spieler (Gefiltert)
             const publicPlayers = {};
             for (const [name, data] of Object.entries(players)) {
+                // Nur verifizierte Spieler senden!
                 if (!data.isVerified) continue;
+
                 const answerVisible = currentRound.revealed ? data.answer : null;
                 publicPlayers[name] = { 
                     lives: data.lives, 
                     hasAnswered: data.hasAnswered,
                     connected: data.connected,
                     answer: answerVisible
+                    // WICHTIG: Kein 'code' oder 'isVerified' Flag nötig, 
+                    // da Anwesenheit in dieser Liste = Verified bedeutet.
                 };
             }
             
@@ -168,79 +177,18 @@ io.on('connection', (socket) => {
                 roundNumber: globalRoundCounter
             });
 
+            // 2. Daten für GM (Vollständig)
             io.to('gamemaster_room').emit('gm_update_full', {
                 gameId: currentGameId,
                 round: currentRound,
-                players: players, 
+                players: players, // Enthält auch Pending Spieler & Codes
                 history: sessionHistory,
                 roundNumber: globalRoundCounter
             });
-        } catch (e) {
-            console.error("Fehler beim Broadcast:", e);
-        }
+        } catch (e) { console.error("Broadcast Error", e); }
     };
 
-    // --- ANALYSE / STATS LOGIK ---
-    socket.on('request_gamelist', async () => {
-        try {
-            const snapshot = await db.collection('games').orderBy('lastUpdated', 'desc').limit(20).get();
-            const games = [];
-            snapshot.forEach(doc => {
-                const d = doc.data();
-                // Safe date conversion
-                let dateVal = new Date();
-                if (d.lastUpdated && typeof d.lastUpdated.toDate === 'function') {
-                    dateVal = d.lastUpdated.toDate();
-                }
-
-                games.push({
-                    id: doc.id,
-                    date: dateVal,
-                    playersCount: d.players ? Object.keys(d.players).length : 0
-                });
-            });
-            socket.emit('receive_gamelist', games);
-        } catch (e) {
-            console.error("Fehler bei Gamelist:", e);
-            socket.emit('receive_gamelist', []); // Leeres Array bei Fehler
-        }
-    });
-
-    socket.on('request_game_details', async (gameId) => {
-        try {
-            console.log(`Lade Details für ${gameId}...`);
-            const docRef = db.collection('games').doc(gameId);
-            const doc = await docRef.get();
-            
-            if (!doc.exists) {
-                console.log("Spiel nicht gefunden.");
-                socket.emit('error_details', "Spiel nicht gefunden.");
-                return;
-            }
-
-            const gameData = doc.data();
-            
-            // WICHTIG: Timestamp für Client konvertieren, sonst Crash!
-            if(gameData.lastUpdated && typeof gameData.lastUpdated.toDate === 'function') {
-                gameData.lastUpdated = gameData.lastUpdated.toDate(); 
-            }
-
-            const roundsSnap = await docRef.collection('archived_rounds').orderBy('roundId', 'asc').get();
-            const rounds = [];
-            roundsSnap.forEach(r => rounds.push(r.data()));
-
-            socket.emit('receive_game_details', {
-                meta: gameData,
-                rounds: rounds
-            });
-        } catch (e) {
-            console.error("Fehler bei Game Details:", e);
-            socket.emit('error_details', "Fehler beim Laden der Daten.");
-        }
-    });
-
-
-    // --- GM COMMANDS ---
+    // --- GM ---
     socket.on('gm_login', (pw) => {
         if (pw && pw.trim() === GM_PASSWORD) {
             socket.join('gamemaster_room');
@@ -257,9 +205,7 @@ io.on('connection', (socket) => {
         broadcastState();
     });
 
-    socket.on('gm_audio_sync', (data) => {
-        io.emit('audio_sync_command', data);
-    });
+    socket.on('gm_audio_sync', (data) => io.emit('audio_sync_command', data));
 
     socket.on('gm_set_bulk_answers', (answersMap) => {
         for (const [name, val] of Object.entries(answersMap)) {
@@ -300,17 +246,35 @@ io.on('connection', (socket) => {
     });
 
     socket.on('gm_start_round', (data) => {
+        // Alte Frage archivieren
         archiveCurrentQuestion();
 
+        // Wenn "Neue Runde" Button gedrückt wurde: Erst archivieren & erhöhen
+        if (data.isNewGameRound) {
+             const livesSnapshot = {};
+            for (const [name, p] of Object.entries(players)) livesSnapshot[name] = p.lives;
+
+            getArchiveCol().add({
+                roundId: globalRoundCounter,
+                timestamp: admin.firestore.FieldValue.serverTimestamp(),
+                playerLives: livesSnapshot,
+                questions: sessionHistory
+            });
+            sessionHistory = []; 
+            globalRoundCounter++;
+        }
+
+        // Frage vorbereiten
         let roundOptions = data.options || [];
         let correctAnswer = data.correctAnswer;
         let shuffledRight = [];
 
+        // Mischen
         if (data.type === 'MC') {
             roundOptions = shuffleArray(data.options);
         }
         else if (data.type === 'SEQUENCE') {
-            correctAnswer = [...data.options]; 
+            correctAnswer = [...data.options]; // Originalreihenfolge ist Lösung
             roundOptions = shuffleArray(data.options);
         }
         else if (data.type === 'MATCHING') {
@@ -318,6 +282,7 @@ io.on('connection', (socket) => {
             shuffledRight = shuffleArray(rightSide);
         }
 
+        // Neue Runde setzen
         currentRound = {
             type: data.type,
             question: data.question,
@@ -335,6 +300,7 @@ io.on('connection', (socket) => {
             answeringOpen: true 
         };
         
+        // Reset Spieler Antworten
         for (let p in players) {
             players[p].hasAnswered = false;
             players[p].answer = null;
@@ -361,6 +327,7 @@ io.on('connection', (socket) => {
 
     socket.on('gm_close_answering', () => { currentRound.answeringOpen = false; saveGame(); broadcastState(); });
     socket.on('gm_reveal', () => { currentRound.revealed = true; currentRound.answeringOpen = false; saveGame(); broadcastState(); });
+    
     socket.on('gm_modify_lives', (data) => { 
         if (players[data.user]) { 
             let newLives = players[data.user].lives + data.amount;
@@ -375,6 +342,7 @@ io.on('connection', (socket) => {
     socket.on('gm_create_player', (name) => {
         if (!name) return;
         const code = Math.floor(1000 + Math.random() * 9000).toString();
+        // Überschreiben/Neu anlegen
         players[name] = { code, lives: 3, hasAnswered: false, answer: null, connected: false, isVerified: false };
         saveGame();
         io.to('gamemaster_room').emit('gm_player_joined', { name, code, isManual: true });
@@ -389,9 +357,14 @@ io.on('connection', (socket) => {
             isNew = true;
         } else {
             players[name].connected = true;
+            // Wenn schon verifiziert, direkt rein
             if(players[name].isVerified) socket.emit('player_login_success');
         }
-        if (isNew || !players[name].isVerified) io.to('gamemaster_room').emit('gm_player_joined', { name, code: players[name].code, isManual: false });
+        
+        // GM Benachrichtigen wenn neu ODER noch nicht verifiziert
+        if (isNew || !players[name].isVerified) {
+            io.to('gamemaster_room').emit('gm_player_joined', { name, code: players[name].code, isManual: false });
+        }
         broadcastState();
     });
 
@@ -415,6 +388,7 @@ io.on('connection', (socket) => {
         if (!p || !p.isVerified) return;
         if (p.lives <= 0) return;
         if (currentRound.targetPlayers?.length > 0 && !currentRound.targetPlayers.includes(data.user)) return;
+        
         if (currentRound.answeringOpen) {
             p.answer = data.answer;
             p.hasAnswered = true;
