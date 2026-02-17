@@ -25,7 +25,7 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server, { 
     cors: { origin: "*" },
-    maxHttpBufferSize: 1e7 
+    maxHttpBufferSize: 1e7 // 10 MB Limit
 });
 
 const GM_PASSWORD = "admin"; 
@@ -60,6 +60,7 @@ function shuffleArray(array) {
     return arr;
 }
 
+// --- DB HELPER ---
 const getGameDoc = () => db.collection('games').doc(currentGameId);
 const getArchiveCol = () => db.collection('games').doc(currentGameId).collection('archived_rounds');
 
@@ -86,6 +87,7 @@ async function startNewGameInternal() {
     sessionHistory = [];
     globalRoundCounter = 1;
     console.log(`✨ Neues Spiel erstellt: ${currentGameId}`);
+    
     await META_DOC_REF.set({ activeGameId: currentGameId });
     saveGame();
 }
@@ -96,16 +98,21 @@ async function loadGameData() {
         if (doc.exists) {
             const data = doc.data();
             players = data.players || {};
+            
+            // Runde wiederherstellen
             const loadedRound = data.currentRound || {};
             currentRound = { 
                 ...DEFAULT_ROUND, 
                 ...loadedRound, 
+                // RAM-Daten nicht laden
                 audioData: null, 
                 imageData: null,
                 powerVoter: loadedRound.powerVoter || []
             };
+            
             sessionHistory = data.sessionHistory || [];
             globalRoundCounter = data.globalRoundCounter || 1;
+            
             for (let p in players) players[p].connected = false;
             console.log(`📥 Daten geladen. ${Object.keys(players).length} Spieler.`);
         } else {
@@ -139,6 +146,7 @@ app.get('/gm', (req, res) => res.sendFile(path.join(__dirname, 'public', 'gamema
 app.get('/p/:name', (req, res) => res.sendFile(path.join(__dirname, 'public', 'player.html')));
 app.get('/stats', (req, res) => res.sendFile(path.join(__dirname, 'public', 'analysis.html')));
 
+
 io.on('connection', (socket) => {
     
     const broadcastState = () => {
@@ -163,6 +171,7 @@ io.on('connection', (socket) => {
                 roundNumber: globalRoundCounter
             });
 
+            // GM bekommt ALLES (auch pending)
             io.to('gamemaster_room').emit('gm_update_full', {
                 gameId: currentGameId,
                 round: currentRound,
@@ -173,10 +182,13 @@ io.on('connection', (socket) => {
         } catch (e) { console.error("Broadcast Error", e); }
     };
 
+    // --- GM ---
     socket.on('gm_login', (pw) => {
+        console.log(`🔑 GM Login Versuch`);
         if (pw && pw.trim() === GM_PASSWORD) {
             socket.join('gamemaster_room');
             socket.emit('gm_login_success');
+            console.log("✅ GM Room Joined");
             broadcastState();
         } else {
             socket.emit('gm_login_fail');
@@ -184,13 +196,13 @@ io.on('connection', (socket) => {
     });
 
     socket.on('gm_reset_all', async () => {
+        console.log("🧨 GM RESET triggered");
         saveGame();
         await startNewGameInternal();
         broadcastState();
     });
 
     socket.on('gm_audio_sync', (data) => io.emit('audio_sync_command', data));
-
     socket.on('gm_set_bulk_answers', (answersMap) => {
         for (const [name, val] of Object.entries(answersMap)) {
             if (players[name]) {
@@ -245,17 +257,9 @@ io.on('connection', (socket) => {
         let correctAnswer = data.correctAnswer;
         let shuffledRight = [];
 
-        if (data.type === 'MC') {
-            roundOptions = shuffleArray(data.options);
-        }
-        else if (data.type === 'SEQUENCE') {
-            correctAnswer = [...data.options]; 
-            roundOptions = shuffleArray(data.options);
-        }
-        else if (data.type === 'MATCHING') {
-            const rightSide = data.pairs.map(p => p.right);
-            shuffledRight = shuffleArray(rightSide);
-        }
+        if (data.type === 'MC') roundOptions = shuffleArray(data.options);
+        else if (data.type === 'SEQUENCE') { correctAnswer = [...data.options]; roundOptions = shuffleArray(data.options); }
+        else if (data.type === 'MATCHING') { const rightSide = data.pairs.map(p => p.right); shuffledRight = shuffleArray(rightSide); }
 
         currentRound = {
             type: data.type,
@@ -299,18 +303,7 @@ io.on('connection', (socket) => {
 
     socket.on('gm_close_answering', () => { currentRound.answeringOpen = false; saveGame(); broadcastState(); });
     socket.on('gm_reveal', () => { currentRound.revealed = true; currentRound.answeringOpen = false; saveGame(); broadcastState(); });
-    
-    socket.on('gm_modify_lives', (data) => { 
-        if (players[data.user]) { 
-            let newLives = players[data.user].lives + data.amount;
-            if (newLives > 5) newLives = 5;
-            if (newLives < 0) newLives = 0;
-            players[data.user].lives = newLives; 
-            saveGame(); 
-            broadcastState(); 
-        }
-    });
-
+    socket.on('gm_modify_lives', (data) => { if (players[data.user]) { players[data.user].lives += data.amount; saveGame(); broadcastState(); } });
     socket.on('gm_create_player', (name) => {
         if (!name) return;
         const code = Math.floor(1000 + Math.random() * 9000).toString();
@@ -318,19 +311,32 @@ io.on('connection', (socket) => {
         saveGame();
         io.to('gamemaster_room').emit('gm_player_joined', { name, code, isManual: true });
         broadcastState();
+        console.log("📝 GM Manuell erstellt:", name, code);
     });
 
+    // --- PLAYER JOIN LOGIK ---
     socket.on('player_announce', (name) => {
+        console.log(`👋 Player Announce: ${name}`);
         let isNew = false;
+        
+        // Fix: Prüfen ob undefined
         if (!players[name]) {
-            players[name] = { code: Math.floor(1000 + Math.random() * 9000).toString(), lives: 3, hasAnswered: false, answer: null, connected: true, isVerified: false };
-            saveGame();
+            const code = Math.floor(1000 + Math.random() * 9000).toString();
+            players[name] = { 
+                code, lives: 3, hasAnswered: false, answer: null, connected: true, isVerified: false 
+            };
             isNew = true;
+            saveGame();
+            console.log(`🆕 Neuer Spieler: ${name}, Code: ${code}`);
         } else {
             players[name].connected = true;
+            // Wenn schon verifiziert, auto login
             if(players[name].isVerified) socket.emit('player_login_success');
         }
+        
+        // PING AN GM SENDEN: Wenn neu ODER noch nicht verified
         if (isNew || !players[name].isVerified) {
+            console.log(`🔔 Sende Ping an GM für ${name}`);
             io.to('gamemaster_room').emit('gm_player_joined', { name, code: players[name].code, isManual: false });
         }
         broadcastState();
@@ -339,6 +345,9 @@ io.on('connection', (socket) => {
     socket.on('player_login', (data) => {
         const { name, code } = data;
         const p = players[name];
+        
+        console.log(`🔑 Login Versuch ${name}: ${code}`);
+        
         if (p && String(p.code).trim() === String(code).trim()) {
             p.isVerified = true;
             p.connected = true;
@@ -346,7 +355,9 @@ io.on('connection', (socket) => {
             if (p.hasAnswered) socket.emit('answer_confirmed');
             saveGame();
             broadcastState();
+            console.log(`✅ ${name} eingeloggt`);
         } else {
+            console.log(`⛔ ${name} falscher Code (Erwartet: ${p ? p.code : 'unknown'})`);
             socket.emit('player_login_fail', 'Falscher Code');
         }
     });
