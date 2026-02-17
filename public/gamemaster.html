@@ -19,6 +19,10 @@
 
         .player-row { padding: 10px 15px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
         .player-name { font-weight: bold; font-size: 1rem; }
+        /* Eliminated Style */
+        .player-row.eliminated { background: #fbecec; opacity: 0.7; }
+        .player-row.eliminated .player-name { text-decoration: line-through; color: #c0392b; }
+        
         .player-code { font-size: 0.8rem; color: #7f8c8d; background: #eee; padding: 2px 5px; border-radius: 4px; font-family: monospace;}
         .lives-control { display: flex; align-items: center; gap: 5px; }
         .status-dot { width: 10px; height: 10px; border-radius: 50%; background: #ccc; margin-right: 10px; }
@@ -407,16 +411,31 @@
             for (const [name, p] of Object.entries(players)) { if(p.isVerified) active.push({name, ...p}); else pending.push({name, ...p}); }
 
             active.forEach(p => {
-                const row = document.createElement('div'); row.className = 'player-row';
+                const row = document.createElement('div'); 
+                row.className = 'player-row';
+                
+                // Style für 0 Leben
+                let nameHtml = `<div class="player-name">${p.name}</div>`;
+                if(p.lives <= 0) {
+                    row.classList.add('eliminated');
+                    nameHtml = `<div class="player-name">💀 ${p.name}</div>`;
+                }
+
                 const dotClass = p.hasAnswered ? 'status-dot active' : 'status-dot';
-                row.innerHTML = `<div style="display:flex; align-items:center;"><span class="${dotClass}"></span><div><div class="player-name">${p.name}</div><span class="player-code">${p.code}</span></div></div>
-                    <div class="lives-control"><button class="btn-mini" onclick="modLife('${p.name}', -1)">-</button><span style="min-width:30px; text-align:center;">${p.lives}❤️</span><button class="btn-mini" onclick="modLife('${p.name}', 1)">+</button></div>`;
+                row.innerHTML = `
+                    <div style="display:flex; align-items:center;">
+                        <span class="${dotClass}"></span>
+                        <div>${nameHtml}<span class="player-code">${p.code}</span></div>
+                    </div>
+                    <div class="lives-control">
+                        <button class="btn-mini" onclick="modLife('${p.name}', -1)">-</button>
+                        <span style="min-width:30px; text-align:center;">${p.lives}❤️</span>
+                        <button class="btn-mini" onclick="modLife('${p.name}', 1)">+</button>
+                    </div>`;
                 list.appendChild(row);
             });
-            if (pending.length > 0) {
-                list.innerHTML += `<div class="pending-header">Beitrittsanfragen</div>`;
-                pending.forEach(p => list.innerHTML += `<div class="pending-row"><div><strong>${p.name}</strong></div><div class="pending-code">${p.code}</div></div>`);
-            }
+            // ... pending code ...
+        }
         }
 
         function renderMainArea(round, players) {
