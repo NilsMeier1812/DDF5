@@ -65,9 +65,14 @@
         button { cursor: pointer; transition: filter 0.2s, transform 0.1s; font-family: inherit; }
         button:active { transform: scale(0.98); }
         .btn-new-q { background: var(--primary); color: white; padding: 12px 24px; border: none; border-radius: 8px; font-weight: 600; font-size: 1rem; box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.4); }
-        .btn-close-vote { background: var(--warning); color: white; padding: 12px 24px; border: none; border-radius: 8px; font-weight: 600; }
+        
+        /* Status Buttons */
+        .btn-close-vote { background: var(--warning); color: white; padding: 12px 24px; border: none; border-radius: 8px; font-weight: 600; display: flex; align-items: center; gap: 8px;}
+        .btn-reopen-vote { background: var(--success); color: white; padding: 12px 24px; border: none; border-radius: 8px; font-weight: 600; display: flex; align-items: center; gap: 8px;}
+        
         .btn-reveal { background: var(--purple); color: white; padding: 12px 24px; border: none; border-radius: 8px; font-weight: 600; }
         .btn-finish-round { background: var(--header-bg); color: white; padding: 12px 20px; border: none; border-radius: 8px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+        
         .btn-danger-all { background: var(--danger); color: white; border: none; padding: 5px 10px; border-radius: 4px; font-size: 0.7rem; font-weight: bold; text-transform: uppercase; }
         .btn-mini { background: white; border: 1px solid #d1d5db; padding: 8px; border-radius: 6px; width: 100%; font-weight: 600; color: #374151; }
         .btn-mini:hover { background: #f3f4f6; }
@@ -129,6 +134,7 @@
     </style>
 </head>
 <body>
+    <!-- LOGIN -->
     <div id="login-overlay">
         <div class="login-box">
             <h2>🔒 GM Access</h2>
@@ -141,6 +147,7 @@
     <div id="notification-area"></div>
     
     <div id="main-ui">
+        <!-- SIDEBAR -->
         <div class="sidebar">
             <div class="sidebar-header">
                 <span>SPIELER</span>
@@ -152,13 +159,14 @@
             </div>
         </div>
 
+        <!-- CONTENT -->
         <div class="content">
             <div class="top-bar">
                 <div>
                     <h1>Control Center <span id="game-id-display" style="font-size:1rem; color:#9ca3af; font-weight:normal;"></span></h1>
                 </div>
                 <div class="control-group">
-                    <button id="btn-close-vote" class="btn-close-vote" onclick="closeVote()">🔒 Voting Schließen</button>
+                    <button id="btn-toggle-vote" class="btn-close-vote" onclick="toggleVote()">🔒 Voting Schließen</button>
                     <button id="btn-reveal" class="btn-reveal" onclick="reveal()">👁️ Auflösen</button>
                     <div style="width: 1px; background: #e5e7eb; margin: 0 10px;"></div>
                     <button class="btn-finish-round" onclick="finishRoundPhase()">
@@ -191,6 +199,7 @@
         </div>
     </div>
 
+    <!-- DIALOG MODAL -->
     <dialog id="q-modal">
         <div class="modal-header">
             <strong>Neue Frage konfigurieren</strong>
@@ -262,10 +271,14 @@
         </div>
     </dialog>
 
+    <!-- LOGIC SCRIPT (UNCHANGED) -->
     <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io();
         let currentPlayers = {}; 
+        // Für den Toggle Button
+        let isAnsweringOpen = false;
+
         function login() { const pw = document.getElementById('gm-password').value; socket.emit('gm_login', pw); }
         socket.on('gm_login_success', () => { document.getElementById('login-overlay').style.display = 'none'; document.getElementById('main-ui').style.display = 'flex'; });
         socket.on('gm_login_fail', () => { document.getElementById('login-msg').style.display = 'block'; });
@@ -344,7 +357,16 @@
             closeModal(); document.getElementById('m-question').value = ''; document.getElementById('m-correct-text').value = ''; document.getElementById('m-audio-url').value = ''; document.getElementById('m-audio-file').value = ''; document.getElementById('m-image-url').value = ''; document.getElementById('m-image-file').value = '';
         }
         function toBase64(file) { return new Promise((resolve, reject) => { const reader = new FileReader(); reader.readAsDataURL(file); reader.onload = () => resolve(reader.result); reader.onerror = error => reject(error); }); }
-        function closeVote() { socket.emit('gm_close_answering'); }
+        
+        // --- BUTTON ACTIONS ---
+        function toggleVote() {
+            // Entscheidet basierend auf aktuellem State
+            if (isAnsweringOpen) {
+                socket.emit('gm_close_answering');
+            } else {
+                socket.emit('gm_open_answering');
+            }
+        }
         function reveal() { socket.emit('gm_reveal'); }
         function resetAll() { if(confirm("🚨 ALLES LÖSCHEN?")) socket.emit('gm_reset_all'); }
         function saveOfflineResults() {
@@ -353,6 +375,7 @@
             inputs.forEach(inp => { const user = inp.getAttribute('data-user'); if(inp.value.trim()) answers[user] = inp.value.trim(); });
             socket.emit('gm_set_bulk_answers', answers);
         }
+
         socket.on('gm_update_full', (data) => {
             currentPlayers = data.players; document.getElementById('game-id-display').innerText = `(${data.gameId})`;
             renderSidebar(data.players); renderMainArea(data.round, data.players);
@@ -371,10 +394,41 @@
             if (pending.length > 0) { list.innerHTML += `<div class="pending-header">Beitrittsanfragen</div>`; pending.forEach(p => list.innerHTML += `<div class="pending-row"><div><strong>${p.name}</strong></div><div style="font-family:monospace; font-weight:bold;">${p.code}</div></div>`); }
         }
         function renderMainArea(round, players) {
-            const btnClose = document.getElementById('btn-close-vote'); const btnReveal = document.getElementById('btn-reveal');
-            if (round.type === 'WAITING' || round.revealed || round.type === 'OFFLINE_RESULTS') { btnClose.style.display = 'none'; btnReveal.style.display = 'none'; }
-            else if (round.answeringOpen) { btnClose.style.display = 'inline-block'; btnReveal.style.display = 'none'; }
-            else { btnClose.style.display = 'none'; btnReveal.style.display = 'inline-block'; }
+            const btnVote = document.getElementById('btn-toggle-vote'); 
+            const btnReveal = document.getElementById('btn-reveal');
+            
+            // Speichere globalen Status für Toggle-Funktion
+            isAnsweringOpen = round.answeringOpen;
+
+            // --- BUTTON LOGIK ---
+            if (round.type === 'WAITING' || round.type === 'OFFLINE_RESULTS') { 
+                btnVote.style.display = 'none'; 
+                btnReveal.style.display = 'none'; 
+            }
+            else if (round.answeringOpen) { 
+                // Status: OFFEN
+                btnVote.style.display = 'inline-flex'; 
+                btnVote.innerHTML = '🔒 Voting Schließen';
+                btnVote.className = 'btn-close-vote'; // Gelb/Warnung
+                
+                btnReveal.style.display = 'none'; // Verstecken solange offen
+            }
+            else { 
+                // Status: GESCHLOSSEN
+                if (round.revealed) {
+                    // Schon aufgelöst -> Alles weg
+                    btnVote.style.display = 'none'; 
+                    btnReveal.style.display = 'none';
+                } else {
+                    // Noch nicht aufgelöst -> Wiedereröffnen oder Auflösen
+                    btnVote.style.display = 'inline-flex';
+                    btnVote.innerHTML = '🔓 Wiedereröffnen';
+                    btnVote.className = 'btn-reopen-vote'; // Grün/Success
+                    
+                    btnReveal.style.display = 'inline-block';
+                }
+            }
+
             let qInfo = round.question || "Warte auf Start...";
             if (round.targetPlayers && round.targetPlayers.length > 0) qInfo += ` <span style="color:#dc2626; font-size:1rem; font-weight:normal;">(Nur: ${round.targetPlayers.join(', ')})</span>`;
             if (round.audioData) { gmAudioWrapper.style.display = 'block'; if (gmAudio.dataset.src !== round.audioData) { gmAudio.src = round.audioData; gmAudio.dataset.src = round.audioData; } } else { gmAudioWrapper.style.display = 'none'; gmAudio.pause(); gmAudio.src = ""; gmAudio.dataset.src = ""; }
