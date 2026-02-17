@@ -37,11 +37,13 @@ const DEFAULT_ROUND = {
     type: 'WAITING', question: '', 
     options: [], pairs: [], shuffledRight: [], targetPlayers: [], 
     min: 0, max: 100, 
+    answerCount: 1, // NEU: Für Aufzählen-Modus
     revealed: false, answeringOpen: false, 
     correctAnswer: null,
     audioData: null, 
     imageData: null,
-    videoData: null, // NEU: Für YouTube ID
+    imageRevealed: false, // NEU: Bild Toggle Status
+    videoData: null,
     powerVoter: [],
     startTime: null, 
     endTime: null    
@@ -105,8 +107,9 @@ async function loadGameData() {
                 ...loadedRound, 
                 audioData: null, 
                 imageData: null,
-                videoData: loadedRound.videoData || null, // NEU
-                powerVoter: loadedRound.powerVoter || []
+                videoData: loadedRound.videoData || null,
+                powerVoter: loadedRound.powerVoter || [],
+                imageRevealed: loadedRound.imageRevealed || false
             };
             
             sessionHistory = data.sessionHistory || [];
@@ -126,8 +129,7 @@ function saveGame() {
     const roundToSave = { ...currentRound };
     delete roundToSave.audioData; 
     delete roundToSave.imageData; 
-    // videoData ist klein (String ID), das speichern wir mit ab
-
+    
     getGameDoc().set({
         gameId: currentGameId,
         players, 
@@ -252,6 +254,13 @@ io.on('connection', (socket) => {
     socket.on('gm_audio_sync', (data) => {
         io.emit('audio_sync_command', data);
     });
+    
+    // NEU: Bild Toggle
+    socket.on('gm_toggle_image', (shouldShow) => {
+        currentRound.imageRevealed = !!shouldShow;
+        saveGame();
+        broadcastState();
+    });
 
     socket.on('gm_set_bulk_answers', (answersMap) => {
         for (const [name, val] of Object.entries(answersMap)) {
@@ -319,10 +328,12 @@ io.on('connection', (socket) => {
             targetPlayers: data.targetPlayers || [], 
             min: data.min !== undefined ? Number(data.min) : 0,
             max: data.max !== undefined ? Number(data.max) : 100,
+            answerCount: data.answerCount !== undefined ? Number(data.answerCount) : 1, // NEU
             correctAnswer: correctAnswer, 
             audioData: data.audioData || null, 
             imageData: data.imageData || null,
-            videoData: data.videoData || null, // NEU
+            imageRevealed: false, // Standardmäßig versteckt bei Rundenstart
+            videoData: data.videoData || null,
             powerVoter: data.powerVoter || [],
             revealed: false,
             answeringOpen: true,
