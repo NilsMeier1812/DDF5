@@ -94,6 +94,7 @@
         .answer-card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); border: 1px solid #f3f4f6; position: relative; overflow: hidden; }
         .answer-card strong { display: block; color: #6b7280; font-size: 0.85rem; margin-bottom: 8px; text-transform: uppercase; }
         .answer-val { font-size: 1.2rem; font-weight: 600; color: #111; white-space: pre-wrap; line-height: 1.4; }
+        .diff-badge { background: #fee2e2; color: #b91c1c; font-size: 0.8rem; padding: 2px 6px; border-radius: 4px; font-weight: bold; margin-left: 8px; border: 1px solid #fecaca; }
         
         /* TOASTS */
         #notification-area { position: fixed; bottom: 20px; right: 20px; width: 320px; z-index: 3000; display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
@@ -134,6 +135,10 @@
         /* Offline Inputs */
         .offline-input-row { display: flex; align-items: center; margin-bottom: 10px; background: white; padding: 10px; border-radius: 6px; border: 1px solid #e5e7eb; }
         .offline-input-row label { width: 150px; font-weight: bold; }
+
+        .gm-img-controls { margin-top: 10px; }
+        .btn-img-toggle { background: #4b5563; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 0.9rem; display: flex; align-items: center; gap: 6px; }
+        .btn-img-toggle.visible { background: #16a34a; }
     </style>
 </head>
 <body>
@@ -165,8 +170,10 @@
         <!-- CONTENT -->
         <div class="content">
             <div class="top-bar">
-                <div>
-                    <h1>Control Center <span id="game-id-display" style="font-size:1rem; color:#9ca3af; font-weight:normal;"></span></h1>
+                <div style="display:flex; flex-direction:column;">
+                    <h1 style="margin:0;">Control Center</h1>
+                    <span id="game-id-display" style="font-size:0.85rem; color:#9ca3af;"></span>
+                    <span id="round-counter-display" style="color:var(--primary); font-weight:bold; font-size:0.9rem; margin-top:2px;">Runde 1</span>
                 </div>
                 <div class="control-group">
                     <button id="btn-toggle-vote" class="btn-close-vote" onclick="toggleVote()">🔒 Voting Schließen</button>
@@ -183,7 +190,14 @@
                 <div style="flex:1;">
                     <div id="q-type" class="q-meta">WAITING</div>
                     <div id="q-text">Warte auf Start...</div>
-                    <div id="gm-image-wrapper" style="margin-top:20px; display:none;"><img id="gm-image-display" src="" style="max-height:250px; border-radius:8px; border:1px solid #e5e7eb;"></div>
+                    <div id="gm-image-wrapper" style="margin-top:20px; display:none;">
+                        <img id="gm-image-display" src="" style="max-height:250px; border-radius:8px; border:1px solid #e5e7eb;">
+                        <div class="gm-img-controls">
+                            <button id="btn-img-toggle" class="btn-img-toggle" onclick="toggleImage()">
+                                <span>👁️</span> <span id="img-toggle-text">Bild zeigen</span>
+                            </button>
+                        </div>
+                    </div>
                     <div id="gm-audio-wrapper" style="margin-top:15px; display:none; background:#f3f4f6; padding:10px; border-radius:8px;"><audio id="gm-audio-player" controls style="width:100%;"></audio></div>
                     <div id="gm-video-wrapper" style="margin-top:20px; display:none; background:#000; color:#fff; padding:10px; border-radius:8px; text-align:center;">▶️ YouTube Stream Aktiv (ID: <span id="gm-video-id"></span>)</div>
                 </div>
@@ -217,6 +231,7 @@
                 <label>Modus</label>
                 <select id="m-type" onchange="updateModalFields()">
                     <option value="MC">Multiple Choice</option>
+                    <option value="LIST">Aufzählen (Liste)</option> <!-- NEU -->
                     <option value="SEQUENCE">Reihenfolge (Sortieren)</option>
                     <option value="ESTIMATE">Schätzen (Zahl)</option>
                     <option value="MATCHING">Zuordnen (Paare)</option>
@@ -251,6 +266,7 @@
                     <input type="text" id="m-image-url" placeholder="URL (z.B. .jpg)" style="flex:1;">
                     <input type="file" id="m-image-file" accept="image/*" style="font-size:0.8rem; width:200px;">
                 </div>
+                <div style="margin-top:5px; font-size:0.8rem; color:#6b7280;">Bild wird standardmäßig verborgen gestartet.</div>
             </div>
 
             <div style="display:flex; gap:10px; flex-wrap:wrap;">
@@ -292,6 +308,7 @@
         const socket = io();
         let currentPlayers = {}; 
         let isAnsweringOpen = false;
+        let isImageRevealed = false; // Lokaler State für Image Toggle
         
         // Timer Globals
         let timerInterval = null;
@@ -308,7 +325,7 @@
         const gmAudioWrapper = document.getElementById('gm-audio-wrapper');
         const gmImageWrapper = document.getElementById('gm-image-wrapper');
         const gmImage = document.getElementById('gm-image-display');
-        const gmVideoWrapper = document.getElementById('gm-video-wrapper'); // NEU
+        const gmVideoWrapper = document.getElementById('gm-video-wrapper');
         
         gmAudio.onplay = () => socket.emit('gm_audio_sync', { action: 'play', currentTime: gmAudio.currentTime });
         gmAudio.onpause = () => socket.emit('gm_audio_sync', { action: 'pause', currentTime: gmAudio.currentTime });
@@ -321,6 +338,12 @@
         function generateStechenList() { const c = document.getElementById('stechen-list'); c.innerHTML = ''; for (const [name, p] of Object.entries(currentPlayers)) { if(!p.isVerified) continue; c.innerHTML += `<label class="p-check-label"><input type="checkbox" value="${name}" class="stechen-check" checked> ${name}</label>`; } }
         function generatePowerVoterList() { const c = document.getElementById('powervoter-list'); c.innerHTML = ''; for (const [name, p] of Object.entries(currentPlayers)) { if(!p.isVerified) continue; c.innerHTML += `<label class="p-check-label"><input type="checkbox" value="${name}" class="powervoter-check"> ${name}</label>`; } }
         
+        // Image Toggle Funktion
+        function toggleImage() {
+            // Sende neuen Status an Server
+            socket.emit('gm_toggle_image', !isImageRevealed);
+        }
+
         function updateModalFields() {
             const type = document.getElementById('m-type').value;
             const container = document.getElementById('dynamic-area');
@@ -332,6 +355,9 @@
             
             if (type === 'MC') {
                 container.innerHTML = `<span class="section-label">Antworten:</span><div id="mc-inputs"></div><button class="btn-add-opt" onclick="addMCRow()">+ Option</button>`; addMCRow(); addMCRow(); addMCRow(); addMCRow();
+            } else if (type === 'LIST') {
+                container.innerHTML = `<span class="section-label">Konfiguration:</span><div class="dynamic-row"><label style="width:auto; margin-right:10px;">Anzahl Antworten:</label><input type="number" id="list-count" value="5" min="1" max="20" style="width:80px;"></div>`;
+                solArea.style.display = 'block'; document.getElementById('m-correct-text').placeholder = "Musterlösungen (Optional)";
             } else if (type === 'SEQUENCE') {
                 container.innerHTML = `<span class="section-label">Reihenfolge:</span><div id="seq-inputs"></div><button class="btn-add-opt" onclick="addInputRow('seq-inputs', 'Element...')">+ Element</button>`; addInputRow('seq-inputs', 'Element...'); addInputRow('seq-inputs', 'Element...');
             } else if (type === 'ESTIMATE' || type === 'TEXT') {
@@ -356,7 +382,7 @@
             const type = document.getElementById('m-type').value;
             const text = document.getElementById('m-question').value;
             let qText = text;
-            let options = []; let pairs = []; let min = 0; let max = 100; let targetPlayers = []; let correctAnswer = null; let audioData = null; let imageData = null; let videoData = null; let powerVoter = [];
+            let options = []; let pairs = []; let min = 0; let max = 100; let answerCount = 1; let targetPlayers = []; let correctAnswer = null; let audioData = null; let imageData = null; let videoData = null; let powerVoter = [];
             
             const audioUrl = document.getElementById('m-audio-url').value.trim(); const audioFile = document.getElementById('m-audio-file').files[0];
             const imageUrl = document.getElementById('m-image-url').value.trim(); const imageFile = document.getElementById('m-image-file').files[0];
@@ -369,6 +395,10 @@
             if (type === 'MC') {
                 document.querySelectorAll('#mc-inputs .dynamic-row').forEach(row => { const val = row.querySelector('.mc-text').value.trim(); if(val) { options.push(val); if(row.querySelector('.radio-correct').checked) correctAnswer = val; } });
                 if(options.length < 2) { alert("Min 2 Optionen"); return; } if(!qText) qText = "Wähle aus:";
+            } else if (type === 'LIST') {
+                answerCount = document.getElementById('list-count').value;
+                if(!qText) qText = `Nenne ${answerCount} Dinge:`;
+                const enteredSol = document.getElementById('m-correct-text').value; if(enteredSol) correctAnswer = enteredSol;
             } else if (type === 'SEQUENCE') {
                 document.querySelectorAll('#seq-inputs .dyn-inp').forEach(inp => { if(inp.value.trim()) options.push(inp.value.trim()); }); if(options.length < 2) { alert("Min 2 Elemente"); return; } if(!qText) qText = "Sortiere:"; correctAnswer = [...options];
             } else if (type === 'MATCHING') {
@@ -393,7 +423,7 @@
                 if(!qText) qText = "Offline Ergebnisse";
             }
             
-            socket.emit('gm_start_round', { type, question: qText, options, pairs, min, max, targetPlayers, correctAnswer, audioData, imageData, videoData, powerVoter });
+            socket.emit('gm_start_round', { type, question: qText, options, pairs, min, max, answerCount, targetPlayers, correctAnswer, audioData, imageData, videoData, powerVoter });
             closeModal(); 
             // Reset Fields
             document.getElementById('m-question').value = ''; document.getElementById('m-correct-text').value = ''; 
@@ -430,6 +460,9 @@
 
         socket.on('gm_update_full', (data) => {
             currentPlayers = data.players; document.getElementById('game-id-display').innerText = `(${data.gameId})`;
+            // ROUND COUNTER
+            document.getElementById('round-counter-display').innerText = `Runde ${data.roundNumber}`;
+            
             roundStartTime = data.round.startTime;
             roundEndTime = data.round.endTime;
             renderSidebar(data.players); renderMainArea(data.round, data.players);
@@ -478,6 +511,18 @@
             const btnReveal = document.getElementById('btn-reveal');
             
             isAnsweringOpen = round.answeringOpen;
+            isImageRevealed = round.imageRevealed; // State Update
+
+            // Update Image Button Style
+            const imgBtn = document.getElementById('btn-img-toggle');
+            const imgText = document.getElementById('img-toggle-text');
+            if(isImageRevealed) {
+                imgBtn.classList.add('visible');
+                imgText.innerText = "Bild ist sichtbar";
+            } else {
+                imgBtn.classList.remove('visible');
+                imgText.innerText = "Bild zeigen";
+            }
 
             // --- BUTTON LOGIK ---
             if (round.type === 'WAITING' || round.type === 'OFFLINE_RESULTS' || round.type === 'VIDEO_STREAM') { 
@@ -572,11 +617,28 @@
                 if (p.hasAnswered && p.answer) {
                     const card = document.createElement('div'); card.className = 'answer-card';
                     let displayAnswer = p.answer;
+                    
+                    // SCHÄTZEN DIFFERENZ LOGIK
+                    let diffBadge = "";
+                    if (round.type === 'ESTIMATE' && round.correctAnswer !== null && round.revealed) {
+                         const correct = Number(round.correctAnswer);
+                         const given = Number(p.answer);
+                         if (!isNaN(correct) && !isNaN(given)) {
+                             const diff = Math.abs(correct - given);
+                             diffBadge = `<span class="diff-badge">Diff: ${diff}</span>`;
+                         }
+                    }
+
                     if (round.type === 'MATCHING' && typeof p.answer === 'object') {
                         displayAnswer = '<ul style="margin:0; padding-left:20px;">'; for(const [k, v] of Object.entries(p.answer)) displayAnswer += `<li>${k} ➝ <b>${v}</b></li>`; displayAnswer += '</ul>';
-                    } else if (Array.isArray(p.answer)) displayAnswer = p.answer.join(" → ");
+                    } else if (Array.isArray(p.answer)) {
+                        // Bei LIST als Liste anzeigen
+                        if(round.type === 'LIST') displayAnswer = '<ol style="margin:0; padding-left:20px;">' + p.answer.map(a => `<li>${a}</li>`).join('') + '</ol>';
+                        else displayAnswer = p.answer.join(" → ");
+                    }
+                    
                     if (round.type === 'PLAYER_VOTE') { card.style.borderLeft = "6px solid #ef4444"; card.innerHTML = `<strong>${name} wählt:</strong><div style="font-size:1.5rem; font-weight:bold;">${p.answer}</div>`; }
-                    else card.innerHTML = `<strong>${name}</strong><div class="answer-val" style="color:#2563eb;">${displayAnswer}</div>`;
+                    else card.innerHTML = `<strong>${name}</strong><div class="answer-val" style="color:#2563eb;">${displayAnswer}${diffBadge}</div>`;
                     grid.appendChild(card);
                 }
             }
