@@ -101,7 +101,11 @@
 
         function renderSidebar(players) {
             const list = document.getElementById('sidebar-list'); list.innerHTML = '';
-            for (const [name, p] of Object.entries(players)) { if(!p.connected && !p.isVerified) continue; const li = document.createElement('li'); li.className = 'p-item'; li.innerHTML = `<div class="p-name">${name}</div><div class="p-status"><span class="answered-icon ${p.hasAnswered ? 'visible' : ''}"></span><span style="color:#e74c3c">❤️</span> ${p.lives}</div>`; list.appendChild(li); }
+            // Entferne hier den isVerified check für die Sidebar, da offline Spieler evtl. angezeigt werden sollen
+            // Aber der Server sendet eh nur verified an public.
+            for (const [name, p] of Object.entries(players)) { 
+                const li = document.createElement('li'); li.className = 'p-item'; li.innerHTML = `<div class="p-name">${name}</div><div class="p-status"><span class="answered-icon ${p.hasAnswered ? 'visible' : ''}"></span><span style="color:#e74c3c">❤️</span> ${p.lives}</div>`; list.appendChild(li); 
+            }
         }
         function hideAllModes() { document.querySelectorAll('.mode-container').forEach(el => el.classList.remove('active')); }
         function switchMode(type, roundData, allPlayers) {
@@ -132,7 +136,6 @@
             } else if (type === 'PLAYER_VOTE') { document.getElementById('mode-vote').classList.add('active'); renderPlayerCards(allPlayers); }
         }
 
-        // --- HELPER ZUM FORMATIEREN VON ANTWORTEN (Objekt/Array/Text) ---
         function formatAnswer(val) {
             if (val === null || val === undefined) return '-';
             if (Array.isArray(val)) return val.join(' ➝ ');
@@ -178,7 +181,8 @@
             const container = document.getElementById('vote-player-list'); container.innerHTML = '';
             let count = 0;
             for (const name in players) {
-                if(name === username || !players[name].isVerified) continue;
+                if(name === username) continue;
+                // FIX: Entferne die !players[name].isVerified Prüfung, da Server das schon filtert
                 count++;
                 
                 let historyHTML = '';
@@ -186,7 +190,6 @@
                     historyHTML = '<div class="history-item" style="color:#666">Keine Fragen bisher in dieser Runde.</div>';
                 } else {
                     currentHistory.forEach((roundData, index) => {
-                        // WICHTIG: Nutze formatAnswer für komplexe Antworten!
                         let ans = formatAnswer(roundData.answers[name]);
                         historyHTML += `<div class="history-item"><span style="color:#888;">${index+1}. ${roundData.question}</span><br><span style="color:#3498db;">${ans}</span></div>`;
                     });
