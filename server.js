@@ -4,7 +4,7 @@ const { Server } = require("socket.io");
 const path = require('path');
 const admin = require('firebase-admin');
 
-// --- FIREBASE SETUP ---
+// --- FIREBASE INIT ---
 let serviceAccount;
 try {
     if (process.env.FIREBASE_CREDENTIALS) {
@@ -23,14 +23,12 @@ const META_DOC_REF = db.collection('settings').doc('server_state');
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, { 
-    cors: { origin: "*" },
-    maxHttpBufferSize: 1e7 // 10 MB Limit
-});
+const io = new Server(server, { cors: { origin: "*" }, maxHttpBufferSize: 1e7 });
 
 const GM_PASSWORD = "admin"; 
 
 // --- GAME STATE ---
+let isServerReady = false; // Neu: Verhindert Race Conditions beim Start
 let currentGameId = "init"; 
 let players = {}; 
 
@@ -60,10 +58,10 @@ function shuffleArray(array) {
     return arr;
 }
 
-// --- DB HELPER ---
 const getGameDoc = () => db.collection('games').doc(currentGameId);
 const getArchiveCol = () => db.collection('games').doc(currentGameId).collection('archived_rounds');
 
+// --- STARTUP ---
 async function initServer() {
     try {
         const meta = await META_DOC_REF.get();
@@ -74,9 +72,12 @@ async function initServer() {
         } else {
             await startNewGameInternal();
         }
+        isServerReady = true;
+        console.log("🚀 Server ist bereit für Verbindungen.");
     } catch (e) {
-        console.error("Server Start Fehler:", e);
+        console.error("Critical Init Error:", e);
         await startNewGameInternal();
+        isServerReady = true;
     }
 }
 
@@ -87,7 +88,6 @@ async function startNewGameInternal() {
     sessionHistory = [];
     globalRoundCounter = 1;
     console.log(`✨ Neues Spiel erstellt: ${currentGameId}`);
-    
     await META_DOC_REF.set({ activeGameId: currentGameId });
     saveGame();
 }
@@ -98,28 +98,23 @@ async function loadGameData() {
         if (doc.exists) {
             const data = doc.data();
             players = data.players || {};
-            
-            // Runde wiederherstellen
             const loadedRound = data.currentRound || {};
             currentRound = { 
                 ...DEFAULT_ROUND, 
                 ...loadedRound, 
-                // RAM-Daten nicht laden
-                audioData: null, 
-                imageData: null,
+                audioData: null, imageData: null,
                 powerVoter: loadedRound.powerVoter || []
             };
-            
             sessionHistory = data.sessionHistory || [];
             globalRoundCounter = data.globalRoundCounter || 1;
             
+            // Reset connections
             for (let p in players) players[p].connected = false;
-            console.log(`📥 Daten geladen. ${Object.keys(players).length} Spieler.`);
         } else {
             saveGame();
         }
     } catch (e) {
-        console.error("Lade-Fehler:", e);
+        console.error("Lade Fehler:", e);
     }
 }
 
@@ -149,7 +144,10 @@ app.get('/stats', (req, res) => res.sendFile(path.join(__dirname, 'public', 'ana
 
 io.on('connection', (socket) => {
     
+    // Helper zum Senden des Status
     const broadcastState = () => {
+        if(!isServerReady) return; 
+
         try {
             const publicPlayers = {};
             for (const [name, data] of Object.entries(players)) {
@@ -171,7 +169,7 @@ io.on('connection', (socket) => {
                 roundNumber: globalRoundCounter
             });
 
-            // GM bekommt ALLES (auch pending)
+            // GM bekommt ALLE (auch pending)
             io.to('gamemaster_room').emit('gm_update_full', {
                 gameId: currentGameId,
                 round: currentRound,
@@ -182,13 +180,14 @@ io.on('connection', (socket) => {
         } catch (e) { console.error("Broadcast Error", e); }
     };
 
-    // --- GM ---
+    // --- GM COMMANDS ---
     socket.on('gm_login', (pw) => {
-        console.log(`🔑 GM Login Versuch`);
+        if(!isServerReady) return;
+        console.log(`🔑 GM Login Versuch: ${pw}`);
         if (pw && pw.trim() === GM_PASSWORD) {
             socket.join('gamemaster_room');
             socket.emit('gm_login_success');
-            console.log("✅ GM Room Joined");
+            console.log("✅ GM Room Joined via Login");
             broadcastState();
         } else {
             socket.emit('gm_login_fail');
@@ -196,13 +195,13 @@ io.on('connection', (socket) => {
     });
 
     socket.on('gm_reset_all', async () => {
-        console.log("🧨 GM RESET triggered");
         saveGame();
         await startNewGameInternal();
         broadcastState();
     });
 
     socket.on('gm_audio_sync', (data) => io.emit('audio_sync_command', data));
+
     socket.on('gm_set_bulk_answers', (answersMap) => {
         for (const [name, val] of Object.entries(answersMap)) {
             if (players[name]) {
@@ -218,14 +217,12 @@ io.on('connection', (socket) => {
         archiveCurrentQuestion();
         const livesSnapshot = {};
         for (const [name, p] of Object.entries(players)) livesSnapshot[name] = p.lives;
-
         getArchiveCol().add({
             roundId: globalRoundCounter,
             timestamp: admin.firestore.FieldValue.serverTimestamp(),
             playerLives: livesSnapshot,
             questions: sessionHistory
         });
-
         sessionHistory = [];
         globalRoundCounter++;
         currentRound = { ...DEFAULT_ROUND, question: 'Runde beendet.' };
@@ -304,6 +301,7 @@ io.on('connection', (socket) => {
     socket.on('gm_close_answering', () => { currentRound.answeringOpen = false; saveGame(); broadcastState(); });
     socket.on('gm_reveal', () => { currentRound.revealed = true; currentRound.answeringOpen = false; saveGame(); broadcastState(); });
     socket.on('gm_modify_lives', (data) => { if (players[data.user]) { players[data.user].lives += data.amount; saveGame(); broadcastState(); } });
+    
     socket.on('gm_create_player', (name) => {
         if (!name) return;
         const code = Math.floor(1000 + Math.random() * 9000).toString();
@@ -316,37 +314,40 @@ io.on('connection', (socket) => {
 
     // --- PLAYER JOIN LOGIK ---
     socket.on('player_announce', (name) => {
+        if(!isServerReady) return; // Warten bis Server bereit
+
         console.log(`👋 Player Announce: ${name}`);
         let isNew = false;
         
-        // Fix: Prüfen ob undefined
         if (!players[name]) {
             const code = Math.floor(1000 + Math.random() * 9000).toString();
-            players[name] = { 
-                code, lives: 3, hasAnswered: false, answer: null, connected: true, isVerified: false 
-            };
+            players[name] = { code, lives: 3, hasAnswered: false, answer: null, connected: true, isVerified: false };
             isNew = true;
             saveGame();
-            console.log(`🆕 Neuer Spieler: ${name}, Code: ${code}`);
+            console.log(`🆕 Neuer Spieler angelegt: ${name}`);
         } else {
             players[name].connected = true;
-            // Wenn schon verifiziert, auto login
-            if(players[name].isVerified) socket.emit('player_login_success');
+            if(players[name].isVerified) {
+                 socket.emit('player_login_success');
+            }
         }
         
-        // PING AN GM SENDEN: Wenn neu ODER noch nicht verified
+        // PING AN GM SENDEN (Egal ob neu oder reconnect pending)
         if (isNew || !players[name].isVerified) {
-            console.log(`🔔 Sende Ping an GM für ${name}`);
+            console.log(`🔔 Sende Ping an GM für ${name} (Code: ${players[name].code})`);
             io.to('gamemaster_room').emit('gm_player_joined', { name, code: players[name].code, isManual: false });
         }
+        
         broadcastState();
     });
 
     socket.on('player_login', (data) => {
+        if(!isServerReady) return;
+
         const { name, code } = data;
         const p = players[name];
         
-        console.log(`🔑 Login Versuch ${name}: ${code}`);
+        console.log(`🔑 Login Versuch: ${name} mit ${code}`);
         
         if (p && String(p.code).trim() === String(code).trim()) {
             p.isVerified = true;
@@ -355,17 +356,16 @@ io.on('connection', (socket) => {
             if (p.hasAnswered) socket.emit('answer_confirmed');
             saveGame();
             broadcastState();
-            console.log(`✅ ${name} eingeloggt`);
+            console.log(`✅ ${name} Login erfolgreich.`);
         } else {
-            console.log(`⛔ ${name} falscher Code (Erwartet: ${p ? p.code : 'unknown'})`);
+            console.log(`⛔ ${name} Login fehlgeschlagen.`);
             socket.emit('player_login_fail', 'Falscher Code');
         }
     });
 
     socket.on('submit_answer', (data) => {
         const p = players[data.user];
-        if (!p || !p.isVerified) return;
-        if (p.lives <= 0) return;
+        if (!p || !p.isVerified || p.lives <= 0) return;
         if (currentRound.targetPlayers?.length > 0 && !currentRound.targetPlayers.includes(data.user)) return;
         
         if (currentRound.answeringOpen) {
