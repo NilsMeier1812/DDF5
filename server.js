@@ -23,7 +23,6 @@ const META_DOC_REF = db.collection('settings').doc('server_state');
 
 const app = express();
 const server = http.createServer(app);
-// Erhöhtes Limit für Bilder via Socket
 const io = new Server(server, { 
     cors: { origin: "*" },
     maxHttpBufferSize: 1e7 // 10 MB Limit für Uploads
@@ -40,8 +39,8 @@ let currentRound = {
     min: 0, max: 100, 
     revealed: false, answeringOpen: false, 
     correctAnswer: null,
-    audioData: null, // RAM only
-    imageData: null  // NEU: RAM only
+    audioData: null, 
+    imageData: null 
 };
 let sessionHistory = [];
 let globalRoundCounter = 1;
@@ -89,7 +88,6 @@ async function loadGameData() {
     if (doc.exists) {
         const data = doc.data();
         players = data.players || {};
-        // Restore defaults (Audio/Image ist null beim Laden aus DB)
         currentRound = data.currentRound || { type: 'WAITING', question: '', revealed: false, answeringOpen: false, audioData: null, imageData: null };
         sessionHistory = data.sessionHistory || [];
         globalRoundCounter = data.globalRoundCounter || 1;
@@ -100,10 +98,9 @@ async function loadGameData() {
 }
 
 function saveGame() {
-    // TRICK: Kopie OHNE Audio/Bild für die Datenbank
     const roundToSave = { ...currentRound };
     delete roundToSave.audioData; 
-    delete roundToSave.imageData; // Löschen
+    delete roundToSave.imageData; 
 
     getGameDoc().set({
         gameId: currentGameId,
@@ -139,7 +136,7 @@ io.on('connection', (socket) => {
         
         io.emit('update_game_state', {
             gameId: currentGameId,
-            round: currentRound, // Sendet audioData & imageData an Clients!
+            round: currentRound,
             players: publicPlayers,
             history: sessionHistory,
             roundNumber: globalRoundCounter
@@ -235,7 +232,7 @@ io.on('connection', (socket) => {
             max: data.max !== undefined ? Number(data.max) : 100,
             correctAnswer: correctAnswer, 
             audioData: data.audioData || null, 
-            imageData: data.imageData || null, // NEU
+            imageData: data.imageData || null,
             revealed: false,
             answeringOpen: true 
         };
@@ -266,7 +263,19 @@ io.on('connection', (socket) => {
 
     socket.on('gm_close_answering', () => { currentRound.answeringOpen = false; saveGame(); broadcastState(); });
     socket.on('gm_reveal', () => { currentRound.revealed = true; currentRound.answeringOpen = false; saveGame(); broadcastState(); });
-    socket.on('gm_modify_lives', (data) => { if (players[data.user]) { players[data.user].lives += data.amount; saveGame(); broadcastState(); }});
+    
+    // MODIFIED: Begrenzung 0 bis 5
+    socket.on('gm_modify_lives', (data) => { 
+        if (players[data.user]) { 
+            let newLives = players[data.user].lives + data.amount;
+            if (newLives > 5) newLives = 5;
+            if (newLives < 0) newLives = 0;
+            
+            players[data.user].lives = newLives; 
+            saveGame(); 
+            broadcastState(); 
+        }
+    });
 
     socket.on('gm_create_player', (name) => {
         if (!name) return;
@@ -309,6 +318,10 @@ io.on('connection', (socket) => {
     socket.on('submit_answer', (data) => {
         const p = players[data.user];
         if (!p || !p.isVerified) return;
+        
+        // Blockiere Antworten von eliminierten Spielern (Server-seitiger Schutz)
+        if (p.lives <= 0) return;
+
         if (currentRound.targetPlayers?.length > 0 && !currentRound.targetPlayers.includes(data.user)) return;
         if (currentRound.answeringOpen) {
             p.answer = data.answer;
