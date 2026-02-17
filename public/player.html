@@ -16,119 +16,70 @@
             --text-dim: #94a3b8;
             --border: #334155;
         }
-
         body { font-family: 'Inter', -apple-system, sans-serif; margin: 0; padding: 0; background: var(--bg-dark); color: var(--text-light); display: flex; height: 100vh; overflow: hidden; position: relative;}
-        
-        /* SIDEBAR */
-        .sidebar { 
-            width: 280px; background: #020617; border-right: 1px solid var(--border); 
-            display: flex; flex-direction: column; overflow-y: auto; flex-shrink: 0;
-            position: absolute; top: 0; left: 0; height: 100%; z-index: 500;
-            transform: translateX(-100%); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), width 0.3s ease;
-            box-shadow: 10px 0 30px rgba(0,0,0,0.5);
-        }
+        .sidebar { width: 280px; background: #020617; border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow-y: auto; flex-shrink: 0; position: absolute; top: 0; left: 0; height: 100%; z-index: 500; transform: translateX(-100%); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), width 0.3s ease; box-shadow: 10px 0 30px rgba(0,0,0,0.5); }
         .sidebar.open { transform: translateX(0); }
-        
         .sidebar-header-row { display: flex; justify-content: space-between; align-items: center; padding: 20px; background: #0f172a; border-bottom: 1px solid var(--border); }
         .sidebar-header-row h3 { margin: 0; font-size: 0.9rem; color: var(--primary); text-transform: uppercase; letter-spacing: 1.5px; font-weight: 800; }
         .btn-close-sidebar { background: none; border: none; color: var(--text-dim); font-size: 1.5rem; cursor: pointer; padding: 5px; }
-        
         .sidebar-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 400; display: none; backdrop-filter: blur(4px); }
         .sidebar-overlay.active { display: block; }
-        
-        /* Responsive Desktop Sidebar */
         @media (min-width: 768px) {
             .sidebar { position: relative; transform: none !important; box-shadow: none; width: 0; overflow: hidden; }
             .sidebar.open { width: 300px; border-right: 1px solid var(--border); }
             .sidebar-overlay.active { display: none !important; }
         }
-
-        /* PLAYER LIST */
         .p-item { padding: 15px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: #0f172a; }
         .p-name { font-weight: 600; font-size: 1rem; color: var(--text-light); }
         .p-status { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; color: var(--accent); }
         .answered-icon { width: 10px; height: 10px; background: var(--success); border-radius: 50%; display: none; box-shadow: 0 0 10px rgba(16, 185, 129, 0.4); }
         .answered-icon.visible { display: block; }
-        
         .p-item.eliminated { opacity: 0.4; background: #000; }
         .p-item.eliminated .p-name { text-decoration: line-through; color: var(--text-dim); }
-
-        /* MAIN CONTENT */
         .main-area { flex: 1; display: flex; flex-direction: column; padding: 20px; position: relative; overflow-y: auto; width: 100%; box-sizing: border-box; }
-        
-        /* HEADER */
         .q-header { margin-bottom: 20px; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; padding-top: 40px; }
         .sidebar-toggle { position: absolute; left: 20px; top: 20px; background: var(--bg-card); border: 1px solid var(--border); color: var(--text-light); cursor: pointer; padding: 10px; z-index: 50; border-radius: 10px; transition: all 0.2s; }
         .sidebar-toggle:hover { background: var(--border); }
-        
         .round-indicator { color: var(--primary); font-size: 0.8rem; font-weight: 700; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 2px; background: rgba(99, 102, 241, 0.1); padding: 5px 12px; border-radius: 20px; }
         .q-text { font-size: 1.4rem; font-weight: 700; line-height: 1.4; color: var(--text-light); text-shadow: 0 2px 4px rgba(0,0,0,0.5); margin: 10px 0; }
-
-        /* MODES & INPUTS */
         .mode-container { display: none; height: 100%; flex-direction: column; width: 100%; max-width: 600px; margin: 0 auto; }
         .mode-container.active { display: flex; }
-
-        /* Multiple Choice */
         .mc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; flex: 1; margin-bottom: 20px; align-content: center; }
         .btn-mc { border: none; border-radius: 16px; font-size: 1.3rem; font-weight: 700; color: white; cursor: pointer; padding: 30px 15px; min-height: 100px; word-wrap: break-word; transition: transform 0.1s, filter 0.1s; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
         .btn-mc:active { transform: scale(0.96); filter: brightness(0.9); }
-
-        /* Text Input */
         .text-input-wrapper { display: flex; flex-direction: column; gap: 20px; margin-top: 20px; }
         textarea { width: 100%; height: 150px; padding: 20px; font-size: 1.2rem; border-radius: 16px; border: 2px solid var(--border); background: var(--bg-card); color: white; resize: none; box-sizing: border-box; outline: none; font-family: inherit; }
         textarea:focus { border-color: var(--primary); }
-
-        /* Common Button */
         .btn-submit { background: var(--primary); color: white; padding: 20px; font-size: 1.2rem; border: none; border-radius: 12px; cursor: pointer; font-weight: 700; width: 100%; text-transform: uppercase; letter-spacing: 1px; box-shadow: 0 4px 10px rgba(99, 102, 241, 0.4); transition: background 0.2s; }
         .btn-submit:active { background: var(--primary-active); transform: translateY(2px); }
-
-        /* Cards (Vote / Result) */
         .vote-list, .results-list { display: flex; flex-direction: column; gap: 12px; margin-top: 10px; padding-bottom: 40px; }
         .vote-card, .result-card { background: var(--bg-card); border-radius: 12px; border: 1px solid var(--border); overflow: hidden; display: flex; flex-direction: column; }
         .vote-card-header { display: flex; justify-content: space-between; align-items: stretch; height: 60px; }
         .vote-name { flex: 1; display: flex; align-items: center; padding-left: 20px; font-weight: 600; font-size: 1.1rem; }
-        
         .btn-inspect { background: transparent; border: none; border-left: 1px solid var(--border); color: var(--text-dim); padding: 0 20px; cursor: pointer; font-size: 1.2rem; transition: color 0.2s; }
         .btn-inspect:hover { color: white; background: rgba(255,255,255,0.05); }
-        
         .btn-vote-action { background: var(--accent); border: none; color: white; padding: 0 25px; font-weight: 700; cursor: pointer; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px; }
         .btn-vote-action:active { filter: brightness(0.8); }
-
         .result-card { padding: 15px; }
         .res-name { font-size: 0.8rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; font-weight: 700; margin-bottom: 5px; }
         .res-val { font-size: 1.2rem; font-weight: 600; color: white; }
-
-        /* Sortable & Matching */
         .seq-item, .match-row { background: var(--bg-card); padding: 15px; border-radius: 10px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; border: 1px solid var(--border); }
         .match-select { background: #0f172a; color: white; padding: 10px; border-radius: 8px; border: 1px solid var(--border); outline: none; width: 50%; }
         .btn-move { width: 40px; height: 40px; border-radius: 8px; border: none; background: #334155; color: white; cursor: pointer; margin-left: 5px; font-size: 1.2rem; display: flex; align-items: center; justify-content: center; }
         .btn-move:active { background: #475569; }
         .btn-move:disabled { opacity: 0.2; cursor: default; }
-
-        /* Slider */
         .est-wrapper { display: flex; flex-direction: column; align-items: center; gap: 30px; margin-top: 40px; }
         .est-input { font-size: 3.5rem; width: 100%; text-align: center; background: transparent; color: var(--primary); border: none; border-bottom: 2px solid var(--border); padding: 10px; outline: none; font-weight: 700; }
         .est-range { width: 100%; -webkit-appearance: none; height: 6px; background: var(--border); border-radius: 3px; outline: none; }
         .est-range::-webkit-slider-thumb { -webkit-appearance: none; width: 25px; height: 25px; background: var(--primary); border-radius: 50%; cursor: pointer; box-shadow: 0 0 10px rgba(99, 102, 241, 0.5); }
-
-        /* Login */
         #login-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg-dark); z-index: 2000; display: flex; flex-direction: column; justify-content: center; align-items: center; }
-        .code-input { font-size: 2.5rem; padding: 15px; text-align: center; width: 200px; border-radius: 12px; border: 2px solid var(--border); background: var(--bg-card); color: white; margin-bottom: 30px; letter-spacing: 8px; font-weight: 700; outline: none; }
-        .code-input:focus { border-color: var(--primary); }
-
-        /* Status Toasts & Screens */
         #status-toast { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); background: var(--success); color: #022c22; padding: 12px 25px; border-radius: 30px; font-weight: 700; display: none; z-index: 100; box-shadow: 0 10px 20px rgba(0,0,0,0.5); animation: popUp 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
         @keyframes popUp { from { transform: translate(-50%, 20px); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
-
         #locked-screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.9); z-index: 90; display: none; justify-content: center; align-items: center; flex-direction: column; text-align: center; backdrop-filter: blur(5px); }
         #locked-screen.visible { display: flex; }
-        
         #spectator-screen, #eliminated-screen { text-align: center; padding: 40px; display: none; margin-top: 50px; }
         #spectator-screen.visible, #eliminated-screen.visible { display: block; animation: fadeIn 0.5s; }
-        
         .correct-answer-card { background: #fefce8; color: #713f12; padding: 20px; border-radius: 12px; margin-bottom: 20px; text-align: center; border: 2px solid #fde047; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        
-        /* Media */
         .image-wrapper img { max-width: 100%; border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 10px 20px rgba(0,0,0,0.3); }
         .audio-wrapper { margin-bottom: 20px; background: var(--bg-card); padding: 15px; border-radius: 12px; display: none; border: 1px solid var(--border); }
         .audio-indicator { color: var(--success); font-weight: 700; display: flex; align-items: center; gap: 8px; }
@@ -151,27 +102,16 @@
     </div>
     <div class="main-area">
         <div class="q-header">
-            <button class="sidebar-toggle" onclick="toggleSidebar()">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
-            </button>
+            <button class="sidebar-toggle" onclick="toggleSidebar()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg></button>
             <div class="round-indicator" id="round-display">Runde 1</div>
             <div id="image-container" class="image-wrapper" style="display:none;"></div>
-            <div id="audio-ui" class="audio-wrapper">
-                <div class="audio-status-line" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                    <div id="audio-state-text" class="audio-indicator inactive">🔇 Warten...</div>
-                    <div class="volume-control" style="display:flex; align-items:center; gap:10px; font-size:0.8rem; color:var(--text-dim);">
-                        <span>Vol</span><input type="range" min="0" max="1" step="0.1" value="1" oninput="setVolume(this.value)">
-                    </div>
-                </div>
-                <button id="btn-enable-audio" onclick="enableAudio()" style="background:var(--accent); border:none; color:white; padding:12px; width:100%; border-radius:8px; font-weight:700; cursor:pointer;">🔊 Audio aktivieren (Klicken!)</button>
-            </div>
+            <div id="audio-ui" class="audio-wrapper"><div class="audio-status-line" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;"><div id="audio-state-text" class="audio-indicator inactive">🔇 Warten...</div><div class="volume-control" style="display:flex; align-items:center; gap:10px; font-size:0.8rem; color:var(--text-dim);"><span>Vol</span><input type="range" min="0" max="1" step="0.1" value="1" oninput="setVolume(this.value)"></div></div><button id="btn-enable-audio" onclick="enableAudio()" style="background:var(--accent); border:none; color:white; padding:12px; width:100%; border-radius:8px; font-weight:700; cursor:pointer;">🔊 Audio aktivieren (Klicken!)</button></div>
             <div class="q-text" id="display-question">Warte auf Spielstart...</div>
         </div>
         <div id="status-toast">✅ Antwort gesendet!</div>
         <div id="locked-screen"><div style="font-size:4rem; margin-bottom:10px;">🔒</div><h3 style="margin:0;">Voting beendet</h3><p style="color:var(--text-dim);">Warte auf Auflösung...</p></div>
         <div id="spectator-screen"><h2 style="color:var(--text-dim);">Nur Zuschauer</h2><p style="color:var(--text-dim);">Du nimmst an dieser Frage nicht teil.</p></div>
         <div id="eliminated-screen"><h2 style="color:var(--accent);">❌ Ausgeschieden</h2><p style="color:var(--text-dim);">Du hast keine Leben mehr.</p></div>
-        
         <div id="mode-results" class="mode-container"><div id="correct-answer-display"></div><h3 style="text-align:center; margin-top:0; color:var(--text-dim); font-size:0.9rem; text-transform:uppercase; letter-spacing:1px;">Antworten der Spieler</h3><div class="results-list" id="results-container"></div></div>
         <div id="mode-offline" class="mode-container"><div class="offline-wait-msg"><h2>👀 Schau zum Gamemaster</h2><p>Ergebnisse werden eingetragen...</p></div></div>
         <div id="mode-mc" class="mode-container"><div class="mc-grid" id="mc-container"></div></div>
@@ -271,7 +211,7 @@
         function renderMatchingInterface(pairs, shuffledRight) { const container = document.getElementById('matching-container'); container.innerHTML = ''; const rightValues = shuffledRight || pairs.map(p => p.right).sort(() => Math.random() - 0.5); pairs.forEach(pair => { const row = document.createElement('div'); row.className = 'match-row'; let optionsHTML = '<option value="" disabled selected>-- Wählen --</option>'; rightValues.forEach(val => optionsHTML += `<option value="${val}">${val}</option>`); row.innerHTML = `<div class="match-label" data-left="${pair.left}">${pair.left}</div><select class="match-select">${optionsHTML}</select>`; container.appendChild(row); }); }
         function renderSequence(items) { const container = document.getElementById('sequence-container'); let currentItems = [...items]; const renderList = () => { container.innerHTML = ''; currentItems.forEach((item, index) => { const row = document.createElement('div'); row.className = 'seq-item'; const upDisabled = index === 0 ? 'disabled' : ''; const downDisabled = index === currentItems.length - 1 ? 'disabled' : ''; row.innerHTML = `<span>${item}</span><div class="seq-controls"><button class="btn-move" onclick="moveSeq(${index}, -1)" ${upDisabled}>▲</button><button class="btn-move" onclick="moveSeq(${index}, 1)" ${downDisabled}>▼</button></div>`; container.appendChild(row); }); }; window.moveSeq = (idx, dir) => { const temp = currentItems[idx]; currentItems[idx] = currentItems[idx + dir]; currentItems[idx + dir] = temp; renderList(); }; window.getSequenceData = () => currentItems; renderList(); }
         function initEstimate(min, max) { const inp = document.getElementById('est-val'); const sli = document.getElementById('est-slide'); inp.min = min; inp.max = max; inp.value = ''; sli.min = min; sli.max = max; sli.value = min; window.syncEst = (val) => { inp.value = val; }; inp.oninput = () => { sli.value = inp.value; }; }
-        function renderPlayerCards(players) { const container = document.getElementById('vote-player-list'); container.innerHTML = ''; let count = 0; for (const name in players) { if(name === username) continue; if(!players[name].isVerified) continue; if(players[name].lives <= 0) continue; count++; let historyHTML = ''; if (!currentHistory || currentHistory.length === 0) { historyHTML = '<div class="history-item" style="color:#666">Keine Fragen bisher in dieser Runde.</div>'; } else { currentHistory.forEach((roundData, index) => { let ans = formatAnswer(roundData.answers[name]); historyHTML += `<div class="history-item"><span class="h-q">${index+1}. ${roundData.question}</span><br><span class="h-a">${ans}</span></div>`; }); } const card = document.createElement('div'); card.className = 'vote-card'; card.innerHTML = `<div class="vote-card-header"><div class="vote-name">${name}</div><button class="btn-inspect" onclick="toggleHistory(this)">👁️</button><button class="btn-vote-action" onclick="sendAnswer('${name}')">VOTE</button></div><div class="vote-history">${historyHTML}</div>`; container.appendChild(card); } if(count === 0) { container.innerHTML = `<div style="text-align:center; color:#666; padding:20px;">Keine Gegner mehr übrig...<br>(Du hast wohl gewonnen?)</div>`; } }
+        function renderPlayerCards(players) { const container = document.getElementById('vote-player-list'); container.innerHTML = ''; let count = 0; for (const name in players) { if(name === username) continue; if(players[name].lives <= 0) continue; count++; let historyHTML = ''; if (!currentHistory || currentHistory.length === 0) { historyHTML = '<div class="history-item" style="color:#666">Keine Fragen bisher in dieser Runde.</div>'; } else { currentHistory.forEach((roundData, index) => { let ans = formatAnswer(roundData.answers[name]); historyHTML += `<div class="history-item"><span class="h-q">${index+1}. ${roundData.question}</span><br><span class="h-a">${ans}</span></div>`; }); } const card = document.createElement('div'); card.className = 'vote-card'; card.innerHTML = `<div class="vote-card-header"><div class="vote-name">${name}</div><button class="btn-inspect" onclick="toggleHistory(this)">👁️</button><button class="btn-vote-action" onclick="sendAnswer('${name}')">VOTE</button></div><div class="vote-history">${historyHTML}</div>`; container.appendChild(card); } if(count === 0) { container.innerHTML = `<div style="text-align:center; color:#666; padding:20px;">Keine Gegner mehr übrig...<br>(Du hast wohl gewonnen?)</div>`; } }
         window.toggleHistory = function(btn) { const h = btn.parentElement.nextElementSibling; if (h.classList.contains('show')) { h.classList.remove('show'); btn.style.background="#444"; } else { h.classList.add('show'); btn.style.background="#555"; } };
         function sendAnswer(val) { socket.emit('submit_answer', { user: username, answer: val }); }
         function sendText() { const val = document.getElementById('text-answer').value; if(val.trim()) sendAnswer(val); }
