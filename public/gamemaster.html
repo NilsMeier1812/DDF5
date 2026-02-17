@@ -40,9 +40,9 @@
         .answers-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 15px; }
         .answer-card { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); border: 1px solid #eee; overflow-wrap: break-word;}
         
-        /* TOAST */
         #notification-area { position: fixed; bottom: 20px; right: 20px; width: 300px; z-index: 3000; display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
         .toast { background: #2c3e50; color: white; padding: 15px; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); animation: slideIn 0.3s; pointer-events: all; border-left: 5px solid #f39c12; display: flex; justify-content: space-between; align-items: center;}
+        .toast-code { font-family: monospace; font-size: 1.5rem; background: rgba(255,255,255,0.1); padding: 2px 8px; border-radius: 4px; color: #2ecc71; }
         @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
 
         dialog { border: none; border-radius: 8px; padding: 0; box-shadow: 0 10px 40px rgba(0,0,0,0.3); width: 700px; max-width: 95%; }
@@ -122,7 +122,7 @@
 
     <!-- MODAL -->
     <dialog id="q-modal">
-        <!-- ... gleicher Modal Inhalt wie zuvor ... -->
+        <!-- MODAL CONTENT SAME AS BEFORE -->
         <div class="modal-header">
             <strong>Frage konfigurieren</strong>
             <button onclick="closeModal()" style="background:none; border:none; cursor:pointer; font-size:1.5rem;">&times;</button>
@@ -141,7 +141,6 @@
             <label><strong>Frage / Titel:</strong></label>
             <input type="text" id="m-question" placeholder="Fragetext eingeben...">
 
-            <!-- STECHEN OPTION -->
             <div style="margin-top:10px;">
                 <button class="btn-mini" onclick="toggleStechen()">⚔️ Stechen / Zielgruppe einschränken</button>
                 <div id="stechen-area">
@@ -150,7 +149,6 @@
                 </div>
             </div>
 
-            <!-- DYNAMISCHER BEREICH -->
             <div id="dynamic-area"></div>
         </div>
         <div class="modal-footer">
@@ -179,11 +177,17 @@
             const toast = document.createElement('div');
             toast.className = 'toast';
             toast.innerHTML = `
-                <div><strong>${data.name}</strong><div style="font-size:0.8rem">Wartet auf Beitritt</div></div>
-                <div style="font-family:monospace; font-size:1.5rem; font-weight:bold;">${data.code}</div>
+                <div>
+                    <strong>Neuer Spieler: ${data.name}</strong>
+                    <small>${data.isManual ? 'Manuell erstellt' : 'Beigetreten'}</small>
+                </div>
+                <div class="toast-code">${data.code}</div>
             `;
             container.appendChild(toast);
-            setTimeout(() => toast.remove(), 10000);
+            setTimeout(() => { 
+                toast.style.opacity = '0';
+                setTimeout(() => toast.remove(), 300);
+            }, 10000);
         });
 
         function manualAddPlayer() {
@@ -192,12 +196,7 @@
         }
 
         const modal = document.getElementById('q-modal');
-        function openModal() { 
-            updateModalFields(); 
-            generateStechenList(); 
-            document.getElementById('stechen-area').style.display = 'none';
-            modal.showModal(); 
-        }
+        function openModal() { updateModalFields(); generateStechenList(); document.getElementById('stechen-area').style.display = 'none'; modal.showModal(); }
         function closeModal() { modal.close(); }
 
         function toggleStechen() {
@@ -209,9 +208,7 @@
             const container = document.getElementById('stechen-list');
             container.innerHTML = '';
             for (const [name, p] of Object.entries(currentPlayers)) {
-                // Nur verifizierte Spieler können am Stechen teilnehmen
                 if(!p.isVerified) continue;
-                
                 const label = document.createElement('label');
                 label.className = 'p-check-label';
                 label.innerHTML = `<input type="checkbox" value="${name}" class="stechen-check" checked> ${name}`;
@@ -265,64 +262,41 @@
             const type = document.getElementById('m-type').value;
             const text = document.getElementById('m-question').value;
             let qText = text;
-            
-            let options = [];
-            let pairs = [];
-            let min = 0, max = 100;
-            let targetPlayers = [];
+            let options = []; let pairs = []; let min = 0; let max = 100; let targetPlayers = [];
 
             if (document.getElementById('stechen-area').style.display === 'block') {
-                document.querySelectorAll('.stechen-check').forEach(cb => {
-                    if (cb.checked) targetPlayers.push(cb.value);
-                });
-                // Checke ob alle oder nur manche
-                // Logik hier etwas vereinfacht: Senden, Server filtert
+                document.querySelectorAll('.stechen-check').forEach(cb => { if (cb.checked) targetPlayers.push(cb.value); });
+                if (targetPlayers.length === Object.keys(currentPlayers).filter(k=>currentPlayers[k].isVerified).length) targetPlayers = [];
             }
 
             if (type === 'MC' || type === 'SEQUENCE') {
-                document.querySelectorAll('.dyn-inp').forEach(inp => {
-                    if(inp.value.trim()) options.push(inp.value.trim());
-                });
+                document.querySelectorAll('.dyn-inp').forEach(inp => { if(inp.value.trim()) options.push(inp.value.trim()); });
                 if(options.length < 2) { alert("Mindestens 2 Elemente nötig."); return; }
                 if(!qText) qText = type === 'MC' ? "Wähle aus:" : "Sortiere:";
             } 
             else if (type === 'ESTIMATE') {
-                min = document.getElementById('est-min').value;
-                max = document.getElementById('est-max').value;
-                if(min === '' || max === '') { alert("Min/Max angeben!"); return; }
+                min = document.getElementById('est-min').value; max = document.getElementById('est-max').value;
+                if(min==='' || max==='') { alert("Min/Max angeben!"); return; }
                 if(!qText) qText = `Schätze zwischen ${min} und ${max}:`;
             }
             else if (type === 'MATCHING') {
-                const lefts = document.querySelectorAll('.match-l');
-                const rights = document.querySelectorAll('.match-r');
-                for(let i=0; i<lefts.length; i++) {
-                    if(lefts[i].value.trim()) pairs.push({ left: lefts[i].value.trim(), right: rights[i].value.trim() });
-                }
+                const lefts = document.querySelectorAll('.match-l'); const rights = document.querySelectorAll('.match-r');
+                for(let i=0; i<lefts.length; i++) if(lefts[i].value.trim()) pairs.push({ left: lefts[i].value.trim(), right: rights[i].value.trim() });
                 if(pairs.length < 2) { alert("Mindestens 2 Paare."); return; }
                 if(!qText) qText = "Ordne zu:";
             }
-            else if (type === 'PLAYER_VOTE' && !qText) {
-                qText = 'Wer verliert ein Leben?';
-            }
+            else if (type === 'PLAYER_VOTE' && !qText) qText = 'Wer verliert ein Leben?';
 
             if(isNewGameRound && !confirm("Runde beenden & Archivieren?")) return;
 
-            socket.emit('gm_start_round', { 
-                type, question: qText, options, pairs, min, max, targetPlayers, isNewGameRound 
-            });
+            socket.emit('gm_start_round', { type, question: qText, options, pairs, min, max, targetPlayers, isNewGameRound });
             closeModal();
             document.getElementById('m-question').value = '';
         }
 
-        // --- CORE FUNCTIONS ---
         function closeVote() { socket.emit('gm_close_answering'); }
         function reveal() { socket.emit('gm_reveal'); }
-        
-        function resetAll() {
-            if(confirm("🚨 ACHTUNG: Das startet ein komplett NEUES Spiel!\nWirklich machen?")) {
-                socket.emit('gm_reset_all');
-            }
-        }
+        function resetAll() { if(confirm("🚨 ALLES LÖSCHEN?")) socket.emit('gm_reset_all'); }
 
         socket.on('gm_update_full', (data) => {
             currentPlayers = data.players;
@@ -331,7 +305,6 @@
             renderMainArea(data.round, data.players);
         });
 
-        // WICHTIG: Hier ist die neue Sidebar Logik
         function renderSidebar(players) {
             const list = document.getElementById('sidebar-list');
             list.innerHTML = '';
@@ -344,7 +317,6 @@
                 else pending.push({name, ...p});
             }
 
-            // 1. Aktive Spieler rendern
             active.forEach(p => {
                 const row = document.createElement('div');
                 row.className = 'player-row';
@@ -362,7 +334,6 @@
                 list.appendChild(row);
             });
 
-            // 2. Pending Spieler rendern (falls vorhanden)
             if (pending.length > 0) {
                 const header = document.createElement('div');
                 header.className = 'pending-header';
@@ -373,10 +344,7 @@
                     const row = document.createElement('div');
                     row.className = 'pending-row';
                     row.innerHTML = `
-                        <div>
-                            <div style="font-weight:bold;">${p.name}</div>
-                            <div style="font-size:0.8rem; color:#888;">Wartet auf Code...</div>
-                        </div>
+                        <div><div style="font-weight:bold;">${p.name}</div><div style="font-size:0.8rem; color:#888;">Wartet auf Code...</div></div>
                         <div class="pending-code">${p.code}</div>
                     `;
                     list.appendChild(row);
@@ -385,28 +353,21 @@
         }
 
         function renderMainArea(round, players) {
-            // Button Visibility Logic
             const btnClose = document.getElementById('btn-close-vote');
             const btnReveal = document.getElementById('btn-reveal');
 
             if (round.type === 'WAITING') {
-                btnClose.style.display = 'none';
-                btnReveal.style.display = 'none';
+                btnClose.style.display = 'none'; btnReveal.style.display = 'none';
             } else if (round.answeringOpen) {
-                btnClose.style.display = 'inline-block';
-                btnReveal.style.display = 'none';
+                btnClose.style.display = 'inline-block'; btnReveal.style.display = 'none';
             } else if (!round.revealed) {
-                btnClose.style.display = 'none';
-                btnReveal.style.display = 'inline-block';
+                btnClose.style.display = 'none'; btnReveal.style.display = 'inline-block';
             } else {
-                btnClose.style.display = 'none';
-                btnReveal.style.display = 'none';
+                btnClose.style.display = 'none'; btnReveal.style.display = 'none';
             }
 
             let qInfo = round.question || "Pause";
-            if (round.targetPlayers && round.targetPlayers.length > 0) {
-                qInfo += ` <span style="color:#e74c3c; font-size:0.8rem;">(Nur: ${round.targetPlayers.join(', ')})</span>`;
-            }
+            if (round.targetPlayers && round.targetPlayers.length > 0) qInfo += ` <span style="color:#e74c3c; font-size:0.8rem;">(Nur: ${round.targetPlayers.join(', ')})</span>`;
             document.getElementById('q-text').innerHTML = qInfo;
             document.getElementById('q-type').innerText = round.type;
 
@@ -415,13 +376,11 @@
 
             let count = 0;
             for (const [name, p] of Object.entries(players)) {
-                if(!p.isVerified) continue; // Pending nicht bei Antworten zählen
-
+                if(!p.isVerified) continue;
                 if (p.hasAnswered) count++;
                 if (p.hasAnswered && p.answer) {
                     const card = document.createElement('div');
                     card.className = 'answer-card';
-                    
                     let displayAnswer = p.answer;
                     
                     if (round.type === 'MATCHING' && typeof p.answer === 'object') {
