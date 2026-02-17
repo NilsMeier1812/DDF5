@@ -42,7 +42,7 @@ const DEFAULT_ROUND = {
     correctAnswer: null,
     audioData: null, 
     imageData: null,
-    powerVoter: [] // NEU: Array für mehrere Power Voter
+    powerVoter: []
 };
 let currentRound = { ...DEFAULT_ROUND };
 let sessionHistory = [];
@@ -103,7 +103,7 @@ async function loadGameData() {
                 ...loadedRound, 
                 audioData: null, 
                 imageData: null,
-                powerVoter: loadedRound.powerVoter || [] // Sicherstellen dass es ein Array ist
+                powerVoter: loadedRound.powerVoter || []
             };
             
             sessionHistory = data.sessionHistory || [];
@@ -136,13 +136,18 @@ function saveGame() {
 
 initServer();
 
+// --- ROUTING ---
 app.use(express.static('public'));
 app.get('/', (req, res) => res.send(`Server Online. Game: ${currentGameId}`));
 app.get('/gm', (req, res) => res.sendFile(path.join(__dirname, 'public', 'gamemaster.html')));
 app.get('/p/:name', (req, res) => res.sendFile(path.join(__dirname, 'public', 'player.html')));
+// NEU: Statistik Seite
+app.get('/stats', (req, res) => res.sendFile(path.join(__dirname, 'public', 'analysis.html')));
+
 
 io.on('connection', (socket) => {
     
+    // --- STANDARD GAME LOGIK ---
     const broadcastState = () => {
         try {
             const publicPlayers = {};
@@ -177,15 +182,57 @@ io.on('connection', (socket) => {
         }
     };
 
+    // --- NEU: ANALYSE LOGIK ---
+    socket.on('request_gamelist', async () => {
+        try {
+            // Hole die letzten 20 Spiele
+            const snapshot = await db.collection('games').orderBy('lastUpdated', 'desc').limit(20).get();
+            const games = [];
+            snapshot.forEach(doc => {
+                const d = doc.data();
+                games.push({
+                    id: doc.id,
+                    date: d.lastUpdated ? d.lastUpdated.toDate() : new Date(),
+                    playersCount: d.players ? Object.keys(d.players).length : 0
+                });
+            });
+            socket.emit('receive_gamelist', games);
+        } catch (e) {
+            console.error("Fehler bei Gamelist:", e);
+        }
+    });
+
+    socket.on('request_game_details', async (gameId) => {
+        try {
+            const docRef = db.collection('games').doc(gameId);
+            const doc = await docRef.get();
+            
+            if (!doc.exists) return;
+
+            const gameData = doc.data();
+            
+            // Subcollection 'archived_rounds' holen
+            const roundsSnap = await docRef.collection('archived_rounds').orderBy('roundId', 'asc').get();
+            const rounds = [];
+            roundsSnap.forEach(r => rounds.push(r.data()));
+
+            socket.emit('receive_game_details', {
+                meta: gameData,
+                rounds: rounds
+            });
+        } catch (e) {
+            console.error("Fehler bei Game Details:", e);
+        }
+    });
+
+
+    // --- GM LOGIN ---
     socket.on('gm_login', (pw) => {
-        console.log(`🔑 Login Versuch mit: '${pw}'`);
         if (pw && pw.trim() === GM_PASSWORD) {
             socket.join('gamemaster_room');
             socket.emit('gm_login_success');
-            console.log("✅ GM erfolgreich eingeloggt.");
             broadcastState();
         } else {
-            console.warn("⛔ GM Login fehlgeschlagen.");
             socket.emit('gm_login_fail');
         }
     });
@@ -201,7 +248,6 @@ io.on('connection', (socket) => {
         io.emit('audio_sync_command', data);
     });
 
-    // --- MANUELLE EINGABE VOM GM (OFFLINE GAMES) ---
     socket.on('gm_set_bulk_answers', (answersMap) => {
         for (const [name, val] of Object.entries(answersMap)) {
             if (players[name]) {
@@ -271,7 +317,7 @@ io.on('connection', (socket) => {
             correctAnswer: correctAnswer, 
             audioData: data.audioData || null, 
             imageData: data.imageData || null,
-            powerVoter: data.powerVoter || [], // NEU: Array
+            powerVoter: data.powerVoter || [],
             revealed: false,
             answeringOpen: true 
         };
