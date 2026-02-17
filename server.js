@@ -151,6 +151,7 @@ io.on('connection', (socket) => {
             const publicPlayers = {};
             for (const [name, data] of Object.entries(players)) {
                 if (!data.isVerified) continue;
+                // Answer nur zeigen, wenn revealed
                 const answerVisible = currentRound.revealed ? data.answer : null;
                 publicPlayers[name] = { 
                     lives: data.lives, 
@@ -187,7 +188,6 @@ io.on('connection', (socket) => {
             const games = [];
             snapshot.forEach(doc => {
                 const d = doc.data();
-                // Safe date conversion
                 let dateVal = new Date();
                 if (d.lastUpdated && typeof d.lastUpdated.toDate === 'function') {
                     dateVal = d.lastUpdated.toDate();
@@ -202,7 +202,7 @@ io.on('connection', (socket) => {
             socket.emit('receive_gamelist', games);
         } catch (e) {
             console.error("Fehler bei Gamelist:", e);
-            socket.emit('receive_gamelist', []); // Leeres Array bei Fehler
+            socket.emit('receive_gamelist', []); 
         }
     });
 
@@ -220,7 +220,6 @@ io.on('connection', (socket) => {
 
             const gameData = doc.data();
             
-            // WICHTIG: Timestamp für Client konvertieren, sonst Crash!
             if(gameData.lastUpdated && typeof gameData.lastUpdated.toDate === 'function') {
                 gameData.lastUpdated = gameData.lastUpdated.toDate(); 
             }
@@ -359,8 +358,27 @@ io.on('connection', (socket) => {
         }
     }
 
-    socket.on('gm_close_answering', () => { currentRound.answeringOpen = false; saveGame(); broadcastState(); });
-    socket.on('gm_reveal', () => { currentRound.revealed = true; currentRound.answeringOpen = false; saveGame(); broadcastState(); });
+    socket.on('gm_close_answering', () => { 
+        currentRound.answeringOpen = false; 
+        saveGame(); 
+        broadcastState(); 
+    });
+
+    // NEU: Feature um Voting wieder zu öffnen
+    socket.on('gm_open_answering', () => { 
+        currentRound.answeringOpen = true; 
+        currentRound.revealed = false; 
+        saveGame(); 
+        broadcastState(); 
+    });
+    
+    socket.on('gm_reveal', () => { 
+        currentRound.revealed = true; 
+        currentRound.answeringOpen = false; 
+        saveGame(); 
+        broadcastState(); 
+    });
+    
     socket.on('gm_modify_lives', (data) => { 
         if (players[data.user]) { 
             let newLives = players[data.user].lives + data.amount;
