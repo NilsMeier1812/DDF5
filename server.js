@@ -25,7 +25,7 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server, { 
     cors: { origin: "*" },
-    maxHttpBufferSize: 1e7 // 10 MB Limit für Uploads
+    maxHttpBufferSize: 1e7 
 });
 
 const GM_PASSWORD = "admin"; 
@@ -33,7 +33,6 @@ const GM_PASSWORD = "admin";
 // --- GAME STATE ---
 let currentGameId = "init"; 
 let players = {}; 
-// Standard-Werte für eine Runde
 const DEFAULT_ROUND = { 
     type: 'WAITING', question: '', 
     options: [], pairs: [], shuffledRight: [], targetPlayers: [], 
@@ -141,13 +140,12 @@ app.use(express.static('public'));
 app.get('/', (req, res) => res.send(`Server Online. Game: ${currentGameId}`));
 app.get('/gm', (req, res) => res.sendFile(path.join(__dirname, 'public', 'gamemaster.html')));
 app.get('/p/:name', (req, res) => res.sendFile(path.join(__dirname, 'public', 'player.html')));
-// NEU: Statistik Seite
 app.get('/stats', (req, res) => res.sendFile(path.join(__dirname, 'public', 'analysis.html')));
 
 
 io.on('connection', (socket) => {
     
-    // --- STANDARD GAME LOGIK ---
+    // --- GAME LOGIK ---
     const broadcastState = () => {
         try {
             const publicPlayers = {};
@@ -182,36 +180,51 @@ io.on('connection', (socket) => {
         }
     };
 
-    // --- NEU: ANALYSE LOGIK ---
+    // --- ANALYSE / STATS LOGIK ---
     socket.on('request_gamelist', async () => {
         try {
-            // Hole die letzten 20 Spiele
             const snapshot = await db.collection('games').orderBy('lastUpdated', 'desc').limit(20).get();
             const games = [];
             snapshot.forEach(doc => {
                 const d = doc.data();
+                // Safe date conversion
+                let dateVal = new Date();
+                if (d.lastUpdated && typeof d.lastUpdated.toDate === 'function') {
+                    dateVal = d.lastUpdated.toDate();
+                }
+
                 games.push({
                     id: doc.id,
-                    date: d.lastUpdated ? d.lastUpdated.toDate() : new Date(),
+                    date: dateVal,
                     playersCount: d.players ? Object.keys(d.players).length : 0
                 });
             });
             socket.emit('receive_gamelist', games);
         } catch (e) {
             console.error("Fehler bei Gamelist:", e);
+            socket.emit('receive_gamelist', []); // Leeres Array bei Fehler
         }
     });
 
     socket.on('request_game_details', async (gameId) => {
         try {
+            console.log(`Lade Details für ${gameId}...`);
             const docRef = db.collection('games').doc(gameId);
             const doc = await docRef.get();
             
-            if (!doc.exists) return;
+            if (!doc.exists) {
+                console.log("Spiel nicht gefunden.");
+                socket.emit('error_details', "Spiel nicht gefunden.");
+                return;
+            }
 
             const gameData = doc.data();
             
-            // Subcollection 'archived_rounds' holen
+            // WICHTIG: Timestamp für Client konvertieren, sonst Crash!
+            if(gameData.lastUpdated && typeof gameData.lastUpdated.toDate === 'function') {
+                gameData.lastUpdated = gameData.lastUpdated.toDate(); 
+            }
+
             const roundsSnap = await docRef.collection('archived_rounds').orderBy('roundId', 'asc').get();
             const rounds = [];
             roundsSnap.forEach(r => rounds.push(r.data()));
@@ -222,11 +235,12 @@ io.on('connection', (socket) => {
             });
         } catch (e) {
             console.error("Fehler bei Game Details:", e);
+            socket.emit('error_details', "Fehler beim Laden der Daten.");
         }
     });
 
 
-    // --- GM LOGIN ---
+    // --- GM COMMANDS ---
     socket.on('gm_login', (pw) => {
         if (pw && pw.trim() === GM_PASSWORD) {
             socket.join('gamemaster_room');
@@ -238,7 +252,6 @@ io.on('connection', (socket) => {
     });
 
     socket.on('gm_reset_all', async () => {
-        console.log("🧨 GM RESET triggered");
         saveGame();
         await startNewGameInternal();
         broadcastState();
@@ -348,7 +361,6 @@ io.on('connection', (socket) => {
 
     socket.on('gm_close_answering', () => { currentRound.answeringOpen = false; saveGame(); broadcastState(); });
     socket.on('gm_reveal', () => { currentRound.revealed = true; currentRound.answeringOpen = false; saveGame(); broadcastState(); });
-    
     socket.on('gm_modify_lives', (data) => { 
         if (players[data.user]) { 
             let newLives = players[data.user].lives + data.amount;
