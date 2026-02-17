@@ -164,6 +164,10 @@
         .image-wrapper img { max-width: 100%; border-radius: 12px; box-shadow: var(--shadow); border: 1px solid #333; max-height: 300px; object-fit: contain; background: black; }
         .audio-wrapper { width: 100%; background: #222; padding: 15px; border-radius: 12px; display: none; margin-bottom: 15px; border: 1px solid #333; }
         #btn-enable-audio { width: 100%; padding: 10px; background: #ea580c; border: none; color: white; border-radius: 6px; margin-top: 10px; cursor: pointer; }
+        
+        /* YouTube Embed */
+        .video-responsive { overflow:hidden; padding-bottom:56.25%; position:relative; height:0; border-radius: 12px; border: 1px solid #333; box-shadow: var(--shadow); }
+        .video-responsive iframe { left:0; top:0; height:100%; width:100%; position:absolute; }
     </style>
 </head>
 <body>
@@ -222,6 +226,13 @@
 
             <div class="q-text" id="display-question">Warte auf Start...</div>
         </div>
+        
+        <!-- YOUTUBE PLAYER CONTAINER -->
+        <div id="video-container" style="display:none; width:100%; margin-bottom: 20px;">
+             <div class="video-responsive">
+                 <iframe id="yt-iframe" src="" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+             </div>
+        </div>
 
         <!-- STATUS BAR -->
         <div id="status-progress">0/0 abgegeben</div>
@@ -258,6 +269,13 @@
             <div style="text-align: center; padding: 40px; background: var(--card-color); border-radius: 12px; border: 1px dashed #444;">
                 <h2 style="margin-top:0;">📝 Manuelle Auswertung</h2>
                 <p style="color: #aaa;">Der Gamemaster trägt die Ergebnisse gerade ein.</p>
+            </div>
+        </div>
+        
+        <!-- Stream Mode (Empty Container mostly, video is above) -->
+        <div id="mode-stream" class="mode-container">
+            <div style="text-align: center; padding: 20px; color:#888;">
+                <p>Live Video</p>
             </div>
         </div>
 
@@ -318,6 +336,8 @@
         const audioUI = document.getElementById('audio-ui');
         const audioStatus = document.getElementById('audio-state-text');
         const btnEnableAudio = document.getElementById('btn-enable-audio');
+        const videoContainer = document.getElementById('video-container'); // NEU
+        const videoIframe = document.getElementById('yt-iframe'); // NEU
 
         function setVolume(val) { audioPlayer.volume = val; }
         function enableAudio() {
@@ -422,14 +442,14 @@
                 switchMode('RESULTS', round, data.players); 
                 return; 
             }
-            if (!round.answeringOpen && round.type !== 'WAITING') { 
+            if (!round.answeringOpen && round.type !== 'WAITING' && round.type !== 'VIDEO_STREAM') { 
                 document.getElementById('locked-screen').classList.add('visible'); 
                 return; 
             } else { 
                 document.getElementById('locked-screen').classList.remove('visible'); 
             }
             
-            const currentSignature = round.type + "::" + round.question + "::" + JSON.stringify(round.options || []) + "::" + (round.imageData ? "IMG" : "NOIMG") + "::" + (round.audioData ? "AUDIO" : "NOAUDIO");
+            const currentSignature = round.type + "::" + round.question + "::" + JSON.stringify(round.options || []) + "::" + (round.imageData ? "IMG" : "NOIMG") + "::" + (round.audioData ? "AUDIO" : "NOAUDIO") + "::" + (round.videoData || "NOVIDEO");
             if (currentSignature !== lastRoundSignature) { 
                 lastRoundSignature = currentSignature; 
                 switchMode(round.type, round, data.players); 
@@ -447,10 +467,10 @@
                 let diff = 0;
                 if (roundEndTime) {
                     diff = roundEndTime - roundStartTime;
-                    display.style.color = '#ef4444'; // Rot gestoppt
+                    display.style.color = '#ef4444'; 
                 } else {
                     diff = Date.now() - roundStartTime;
-                    display.style.color = '#22c55e'; // Grün läuft
+                    display.style.color = '#22c55e';
                 }
                 
                 if (diff < 0) diff = 0;
@@ -466,7 +486,7 @@
         function updateStatusBar(round, allPlayers, me) {
             const statusBar = document.getElementById('status-progress');
             
-            if (round.type === 'WAITING' || round.revealed || round.type === 'OFFLINE_RESULTS') {
+            if (round.type === 'WAITING' || round.revealed || round.type === 'OFFLINE_RESULTS' || round.type === 'VIDEO_STREAM') {
                 statusBar.style.display = 'none';
                 return;
             }
@@ -539,15 +559,29 @@
                 imageDiv.innerHTML = `<img src="${roundData.imageData}" alt="Frage Bild">`;
             } else { imageDiv.style.display = 'none'; imageDiv.innerHTML = ''; }
             
+            // --- VIDEO STREAM ---
+            if (roundData.videoData) {
+                videoContainer.style.display = 'block';
+                const ytUrl = `https://www.youtube.com/embed/${roundData.videoData}?autoplay=1&mute=0&controls=1`;
+                if(videoIframe.src !== ytUrl) {
+                    videoIframe.src = ytUrl;
+                }
+            } else {
+                videoContainer.style.display = 'none';
+                videoIframe.src = "";
+            }
+            
             if (type === 'OFFLINE_RESULTS') {
                 if (roundData.revealed) { document.getElementById('mode-results').classList.add('active'); renderResultsTable(allPlayers, roundData); } 
                 else { document.getElementById('mode-offline').classList.add('active'); return; }
+            } else if (type === 'VIDEO_STREAM') {
+                document.getElementById('mode-stream').classList.add('active');
             } else if (type === 'RESULTS') {
                 document.getElementById('mode-results').classList.add('active');
                 renderResultsTable(allPlayers, roundData);
             } else if (type === 'MC') {
                 document.getElementById('mode-mc').classList.add('active'); const cont = document.getElementById('mc-container'); cont.innerHTML = '';
-                const colors = ['#e11d48', '#d97706', '#16a34a', '#2563eb', '#7c3aed']; // Modernere Farben
+                const colors = ['#e11d48', '#d97706', '#16a34a', '#2563eb', '#7c3aed']; 
                 roundData.options.forEach((opt, i) => { const btn = document.createElement('button'); btn.className = 'btn-mc'; btn.innerText = opt; btn.style.background = colors[i % colors.length]; btn.onclick = () => sendAnswer(opt); cont.appendChild(btn); });
             } else if (type === 'SEQUENCE') { document.getElementById('mode-sequence').classList.add('active'); renderSequence(roundData.options);
             } else if (type === 'ESTIMATE') { document.getElementById('mode-estimate').classList.add('active'); initEstimate(roundData.min, roundData.max);
