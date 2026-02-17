@@ -32,20 +32,17 @@ let currentGameId = "init";
 let players = {}; 
 let currentRound = { 
     type: 'WAITING', question: '', 
-    options: [], // Gemischte Optionen für Client
-    pairs: [], 
-    shuffledRight: [], // Für Matching: Rechte Seite gemischt
-    targetPlayers: [], 
+    options: [], pairs: [], shuffledRight: [], targetPlayers: [], 
     min: 0, max: 100, 
     revealed: false, answeringOpen: false, 
-    correctAnswer: null // Die echte Lösung (un-gemischt)
+    correctAnswer: null 
 };
 let sessionHistory = [];
 let globalRoundCounter = 1;
 
 // --- HELPERS ---
 function shuffleArray(array) {
-    const arr = [...array]; // Kopie erstellen
+    const arr = [...array];
     for (let i = arr.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [arr[i], arr[j]] = [arr[j], arr[i]];
@@ -158,6 +155,7 @@ io.on('connection', (socket) => {
         broadcastState();
     });
 
+    // --- GAME FLOW ---
     socket.on('gm_next_round_phase', () => {
         archiveCurrentQuestion();
         
@@ -195,21 +193,14 @@ io.on('connection', (socket) => {
         let correctAnswer = data.correctAnswer;
         let shuffledRight = [];
 
-        // SPEZIAL LOGIK FÜR MISCHEN
         if (data.type === 'MC') {
-            // MC Optionen mischen, aber Text-String Lösung beibehalten
             roundOptions = shuffleArray(data.options);
         }
         else if (data.type === 'SEQUENCE') {
-            // Bei Sequence ist die Eingabe vom GM die korrekte Lösung (Array)
             correctAnswer = [...data.options]; 
-            // Den Spielern schicken wir eine gemischte Version
             roundOptions = shuffleArray(data.options);
         }
         else if (data.type === 'MATCHING') {
-            // Paare (Links->Rechts) werden getrennt. Links bleibt fest, Rechts wird gemischt.
-            // correctAnswer ist das Objekt {Links: Rechts}
-            // Wir bereiten die gemischte rechte Seite für alle vor
             const rightSide = data.pairs.map(p => p.right);
             shuffledRight = shuffleArray(rightSide);
         }
@@ -219,7 +210,7 @@ io.on('connection', (socket) => {
             question: data.question,
             options: roundOptions, 
             pairs: data.pairs || [], 
-            shuffledRight: shuffledRight, // Neu: Gemeinsame Mischung für alle
+            shuffledRight: shuffledRight, 
             targetPlayers: data.targetPlayers || [], 
             min: data.min !== undefined ? Number(data.min) : 0,
             max: data.max !== undefined ? Number(data.max) : 100,
@@ -238,6 +229,8 @@ io.on('connection', (socket) => {
     });
 
     function archiveCurrentQuestion() {
+        // WICHTIG: Auch PLAYER_VOTE wird archiviert, wenn danach "Neue Runde" kommt
+        // Nur WAITING wird ignoriert
         if (currentRound.type !== 'WAITING') {
             const roundAnswers = {};
             for(const [name, p] of Object.entries(players)) {
