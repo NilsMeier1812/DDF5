@@ -12,23 +12,27 @@
         
         #main-ui { display: none; width: 100%; height: 100%; }
         
-        .sidebar { width: 300px; background: #fff; border-right: 1px solid #ddd; display: flex; flex-direction: column; position: relative; }
+        .sidebar { width: 320px; background: #fff; border-right: 1px solid #ddd; display: flex; flex-direction: column; position: relative; }
         .sidebar-header { padding: 20px; background: #2c3e50; color: white; font-weight: bold; flex-shrink: 0; }
         .sidebar-content { flex: 1; overflow-y: auto; }
         .sidebar-footer { padding: 10px; border-top: 1px solid #eee; text-align: center; background: #f9f9f9; }
 
-        .player-row { padding: 15px 20px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
-        .player-name { font-weight: bold; }
-        .player-code { font-size: 0.8rem; color: #7f8c8d; background: #eee; padding: 2px 5px; border-radius: 4px; }
+        .player-row { padding: 10px 15px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
+        .player-name { font-weight: bold; font-size: 1rem; }
+        .player-code { font-size: 0.8rem; color: #7f8c8d; background: #eee; padding: 2px 5px; border-radius: 4px; font-family: monospace;}
         .lives-control { display: flex; align-items: center; gap: 5px; }
         .status-dot { width: 10px; height: 10px; border-radius: 50%; background: #ccc; margin-right: 10px; }
         .status-dot.active { background: #2ecc71; box-shadow: 0 0 5px #2ecc71; }
+
+        /* PENDING SECTION */
+        .pending-header { background: #f39c12; color: white; font-size: 0.8rem; font-weight: bold; padding: 8px 15px; text-transform: uppercase; letter-spacing: 1px; margin-top: 20px;}
+        .pending-row { background: #fffbf0; padding: 15px; border-bottom: 1px solid #fcefd0; display: flex; justify-content: space-between; align-items: center; }
+        .pending-code { font-size: 1.4rem; font-family: monospace; font-weight: bold; color: #d35400; letter-spacing: 2px;}
 
         .content { flex: 1; padding: 30px; display: flex; flex-direction: column; overflow-y: auto; }
         .top-bar { display: flex; justify-content: space-between; margin-bottom: 20px; align-items: center; }
         
         .btn-new-q { background: #3498db; color: white; padding: 12px 25px; border: none; border-radius: 5px; font-size: 1.1rem; cursor: pointer; font-weight: bold; }
-        
         .btn-close-vote { background: #e67e22; color: white; padding: 12px 25px; border: none; border-radius: 5px; font-size: 1.1rem; cursor: pointer; font-weight: bold; margin-right: 10px; }
         .btn-reveal { background: #f1c40f; color: #222; padding: 12px 25px; border: none; border-radius: 5px; font-size: 1.1rem; cursor: pointer; font-weight: bold; margin-right: 10px;}
 
@@ -36,14 +40,11 @@
         .answers-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 15px; }
         .answer-card { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); border: 1px solid #eee; overflow-wrap: break-word;}
         
-        /* TOAST NOTIFICATION */
+        /* TOAST */
         #notification-area { position: fixed; bottom: 20px; right: 20px; width: 300px; z-index: 3000; display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
-        .toast { background: #333; color: white; padding: 15px; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); animation: slideIn 0.3s; pointer-events: all; border-left: 5px solid #2ecc71; display: flex; justify-content: space-between; align-items: center;}
-        .toast strong { font-size: 1.2rem; display: block; margin-bottom: 5px; }
-        .toast-code { font-family: monospace; font-size: 1.5rem; background: rgba(255,255,255,0.1); padding: 2px 8px; border-radius: 4px; color: #2ecc71; }
+        .toast { background: #2c3e50; color: white; padding: 15px; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); animation: slideIn 0.3s; pointer-events: all; border-left: 5px solid #f39c12; display: flex; justify-content: space-between; align-items: center;}
         @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
 
-        /* MODAL */
         dialog { border: none; border-radius: 8px; padding: 0; box-shadow: 0 10px 40px rgba(0,0,0,0.3); width: 700px; max-width: 95%; }
         dialog::backdrop { background: rgba(0,0,0,0.5); }
         .modal-header { background: #f8f9fa; padding: 15px 20px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
@@ -64,7 +65,7 @@
         #stechen-area { border: 1px solid #ddd; padding: 10px; border-radius: 4px; margin-top: 10px; display: none; background: #fafafa; }
         .player-check-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 5px; margin-top: 5px; }
         .p-check-label { display: flex; align-items: center; gap: 5px; font-size: 0.9rem; cursor: pointer; background: white; padding: 5px; border: 1px solid #eee; border-radius: 4px; }
-        
+        .p-check-label input { width: auto; margin: 0; }
         .btn-danger-all { background: #e74c3c; color: white; border: none; padding: 5px 10px; border-radius: 4px; font-size: 0.8rem; cursor: pointer; }
     </style>
 </head>
@@ -121,6 +122,7 @@
 
     <!-- MODAL -->
     <dialog id="q-modal">
+        <!-- ... gleicher Modal Inhalt wie zuvor ... -->
         <div class="modal-header">
             <strong>Frage konfigurieren</strong>
             <button onclick="closeModal()" style="background:none; border:none; cursor:pointer; font-size:1.5rem;">&times;</button>
@@ -171,25 +173,17 @@
             document.getElementById('main-ui').style.display = 'flex';
         });
 
-        // --- NEW PLAYER NOTIFICATION ---
+        // TOAST Notification für neue Spieler
         socket.on('gm_player_joined', (data) => {
             const container = document.getElementById('notification-area');
             const toast = document.createElement('div');
             toast.className = 'toast';
             toast.innerHTML = `
-                <div>
-                    <strong>Neuer Spieler: ${data.name}</strong>
-                    <small>${data.isManual ? 'Manuell erstellt' : 'Beigetreten'}</small>
-                </div>
-                <div class="toast-code">${data.code}</div>
+                <div><strong>${data.name}</strong><div style="font-size:0.8rem">Wartet auf Beitritt</div></div>
+                <div style="font-family:monospace; font-size:1.5rem; font-weight:bold;">${data.code}</div>
             `;
             container.appendChild(toast);
-            
-            // Auto remove nach 10 Sekunden
-            setTimeout(() => { 
-                toast.style.opacity = '0';
-                setTimeout(() => toast.remove(), 300);
-            }, 10000);
+            setTimeout(() => toast.remove(), 10000);
         });
 
         function manualAddPlayer() {
@@ -214,7 +208,10 @@
         function generateStechenList() {
             const container = document.getElementById('stechen-list');
             container.innerHTML = '';
-            for (const name of Object.keys(currentPlayers)) {
+            for (const [name, p] of Object.entries(currentPlayers)) {
+                // Nur verifizierte Spieler können am Stechen teilnehmen
+                if(!p.isVerified) continue;
+                
                 const label = document.createElement('label');
                 label.className = 'p-check-label';
                 label.innerHTML = `<input type="checkbox" value="${name}" class="stechen-check" checked> ${name}`;
@@ -278,7 +275,8 @@
                 document.querySelectorAll('.stechen-check').forEach(cb => {
                     if (cb.checked) targetPlayers.push(cb.value);
                 });
-                if (targetPlayers.length === Object.keys(currentPlayers).length) targetPlayers = [];
+                // Checke ob alle oder nur manche
+                // Logik hier etwas vereinfacht: Senden, Server filtert
             }
 
             if (type === 'MC' || type === 'SEQUENCE') {
@@ -316,7 +314,7 @@
             document.getElementById('m-question').value = '';
         }
 
-        // --- PHASE STEUERUNG ---
+        // --- CORE FUNCTIONS ---
         function closeVote() { socket.emit('gm_close_answering'); }
         function reveal() { socket.emit('gm_reveal'); }
         
@@ -333,29 +331,61 @@
             renderMainArea(data.round, data.players);
         });
 
+        // WICHTIG: Hier ist die neue Sidebar Logik
         function renderSidebar(players) {
             const list = document.getElementById('sidebar-list');
             list.innerHTML = '';
+            
+            const active = [];
+            const pending = [];
+
             for (const [name, p] of Object.entries(players)) {
+                if(p.isVerified) active.push({name, ...p});
+                else pending.push({name, ...p});
+            }
+
+            // 1. Aktive Spieler rendern
+            active.forEach(p => {
                 const row = document.createElement('div');
                 row.className = 'player-row';
                 const dotClass = p.hasAnswered ? 'status-dot active' : 'status-dot';
                 row.innerHTML = `
                     <div style="display:flex; align-items:center;">
                         <span class="${dotClass}"></span>
-                        <div><div class="player-name">${name}</div><span class="player-code">${p.code}</span></div>
+                        <div><div class="player-name">${p.name}</div><span class="player-code">${p.code}</span></div>
                     </div>
                     <div class="lives-control">
-                        <button class="btn-mini" onclick="modLife('${name}', -1)">-</button>
+                        <button class="btn-mini" onclick="modLife('${p.name}', -1)">-</button>
                         <span style="min-width:30px; text-align:center;">${p.lives}❤️</span>
-                        <button class="btn-mini" onclick="modLife('${name}', 1)">+</button>
+                        <button class="btn-mini" onclick="modLife('${p.name}', 1)">+</button>
                     </div>`;
                 list.appendChild(row);
+            });
+
+            // 2. Pending Spieler rendern (falls vorhanden)
+            if (pending.length > 0) {
+                const header = document.createElement('div');
+                header.className = 'pending-header';
+                header.innerText = "Beitrittsanfragen";
+                list.appendChild(header);
+
+                pending.forEach(p => {
+                    const row = document.createElement('div');
+                    row.className = 'pending-row';
+                    row.innerHTML = `
+                        <div>
+                            <div style="font-weight:bold;">${p.name}</div>
+                            <div style="font-size:0.8rem; color:#888;">Wartet auf Code...</div>
+                        </div>
+                        <div class="pending-code">${p.code}</div>
+                    `;
+                    list.appendChild(row);
+                });
             }
         }
 
         function renderMainArea(round, players) {
-            // BUTTON LOGIK
+            // Button Visibility Logic
             const btnClose = document.getElementById('btn-close-vote');
             const btnReveal = document.getElementById('btn-reveal');
 
@@ -385,6 +415,8 @@
 
             let count = 0;
             for (const [name, p] of Object.entries(players)) {
+                if(!p.isVerified) continue; // Pending nicht bei Antworten zählen
+
                 if (p.hasAnswered) count++;
                 if (p.hasAnswered && p.answer) {
                     const card = document.createElement('div');
