@@ -41,9 +41,10 @@ const DEFAULT_ROUND = {
     correctAnswer: null,
     audioData: null, 
     imageData: null,
+    videoData: null, // NEU: Für YouTube ID
     powerVoter: [],
-    startTime: null, // NEU: Zeitstempel für Timer-Start
-    endTime: null    // NEU: Zeitstempel für Timer-Stop
+    startTime: null, 
+    endTime: null    
 };
 let currentRound = { ...DEFAULT_ROUND };
 let sessionHistory = [];
@@ -104,6 +105,7 @@ async function loadGameData() {
                 ...loadedRound, 
                 audioData: null, 
                 imageData: null,
+                videoData: loadedRound.videoData || null, // NEU
                 powerVoter: loadedRound.powerVoter || []
             };
             
@@ -124,6 +126,7 @@ function saveGame() {
     const roundToSave = { ...currentRound };
     delete roundToSave.audioData; 
     delete roundToSave.imageData; 
+    // videoData ist klein (String ID), das speichern wir mit ab
 
     getGameDoc().set({
         gameId: currentGameId,
@@ -319,10 +322,11 @@ io.on('connection', (socket) => {
             correctAnswer: correctAnswer, 
             audioData: data.audioData || null, 
             imageData: data.imageData || null,
+            videoData: data.videoData || null, // NEU
             powerVoter: data.powerVoter || [],
             revealed: false,
             answeringOpen: true,
-            startTime: Date.now(), // Timer startet
+            startTime: Date.now(), 
             endTime: null
         };
         
@@ -352,7 +356,7 @@ io.on('connection', (socket) => {
 
     socket.on('gm_close_answering', () => { 
         currentRound.answeringOpen = false;
-        currentRound.endTime = Date.now(); // Timer stoppt
+        currentRound.endTime = Date.now(); 
         saveGame(); 
         broadcastState(); 
     });
@@ -360,7 +364,7 @@ io.on('connection', (socket) => {
     socket.on('gm_open_answering', () => { 
         currentRound.answeringOpen = true; 
         currentRound.revealed = false; 
-        currentRound.endTime = null; // Timer läuft weiter
+        currentRound.endTime = null;
         saveGame(); 
         broadcastState(); 
     });
@@ -368,7 +372,7 @@ io.on('connection', (socket) => {
     socket.on('gm_reveal', () => { 
         currentRound.revealed = true; 
         currentRound.answeringOpen = false;
-        if(!currentRound.endTime) currentRound.endTime = Date.now(); // Timer stoppt falls noch nicht gestoppt
+        if(!currentRound.endTime) currentRound.endTime = Date.now();
         saveGame(); 
         broadcastState(); 
     });
