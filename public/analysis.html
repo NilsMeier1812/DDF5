@@ -5,73 +5,49 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Spiel-Auswertung</title>
     <style>
-        :root {
-            --bg-dark: #0f172a;
-            --bg-sidebar: #020617;
-            --card-bg: #1e293b;
-            --text-main: #f8fafc;
-            --text-muted: #94a3b8;
-            --primary: #6366f1;
-            --border: #334155;
-            --accent: #f43f5e;
-            --success: #10b981;
-        }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; background: #1a1a1a; color: #e0e0e0; display: flex; height: 100vh; }
+        
+        /* SIDEBAR */
+        .sidebar { width: 300px; background: #252525; border-right: 1px solid #444; overflow-y: auto; display: flex; flex-direction: column;}
+        .sidebar-header { padding: 20px; background: #111; color: #3498db; text-align: center; font-weight: bold; border-bottom: 1px solid #333; }
+        .game-item { padding: 15px 20px; border-bottom: 1px solid #333; cursor: pointer; transition: background 0.2s; }
+        .game-item:hover { background: #333; }
+        .game-item.active { background: #3498db; color: white; border-left: 5px solid #fff; }
+        .game-date { font-size: 0.9rem; font-weight: bold; }
+        .game-id { font-size: 0.7rem; color: #888; font-family: monospace; }
+        .game-item.active .game-id { color: #ddd; }
 
-        body { font-family: 'Inter', system-ui, -apple-system, sans-serif; margin: 0; padding: 0; background: var(--bg-dark); color: var(--text-main); display: flex; height: 100vh; }
-        
-        /* SIDEBAR (GAME LIST) */
-        .sidebar { width: 300px; background: var(--bg-sidebar); border-right: 1px solid var(--border); overflow-y: auto; display: flex; flex-direction: column;}
-        .sidebar-header { padding: 25px; background: var(--bg-sidebar); color: var(--primary); text-align: center; font-weight: 800; border-bottom: 1px solid var(--border); letter-spacing: 1px; font-size: 1.1rem; }
-        
-        .game-item { padding: 18px 25px; border-bottom: 1px solid var(--border); cursor: pointer; transition: all 0.2s; position: relative; }
-        .game-item:hover { background: #1e293b; }
-        .game-item.active { background: #1e293b; border-left: 4px solid var(--primary); padding-left: 21px; }
-        .game-date { font-size: 0.95rem; font-weight: 600; margin-bottom: 4px; color: var(--text-main); }
-        .game-id { font-size: 0.75rem; color: var(--text-muted); font-family: monospace; display: flex; align-items: center; gap: 5px; }
-        
         /* MAIN CONTENT */
-        .content { flex: 1; padding: 50px; overflow-y: auto; max-width: 1200px; margin: 0 auto; box-sizing: border-box; }
-        
-        .header { margin-bottom: 40px; padding-bottom: 20px; border-bottom: 1px solid var(--border); }
-        .header h1 { margin: 0 0 10px 0; font-size: 2.5rem; font-weight: 800; letter-spacing: -1px; }
-        .header-meta { color: var(--text-muted); font-size: 1rem; display: flex; gap: 20px; align-items: center; }
+        .content { flex: 1; padding: 40px; overflow-y: auto; }
+        .header { margin-bottom: 30px; border-bottom: 1px solid #444; padding-bottom: 10px; }
+        .header h1 { margin: 0; font-size: 2rem; color: #fff; }
         
         /* ROUND BLOCK */
-        .round-block { background: var(--card-bg); margin-bottom: 40px; border-radius: 16px; overflow: hidden; border: 1px solid var(--border); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3); }
-        .round-header { background: #334155; padding: 20px 30px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); }
-        .round-title { font-size: 1.3rem; font-weight: 700; color: var(--text-main); }
-        .round-count { background: rgba(0,0,0,0.3); padding: 4px 10px; border-radius: 20px; font-size: 0.85rem; font-weight: 600; color: var(--text-muted); }
+        .round-block { background: #2c2c2c; margin-bottom: 30px; border-radius: 10px; overflow: hidden; border: 1px solid #444; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+        .round-header { background: #333; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #444; }
+        .round-title { font-size: 1.2rem; font-weight: bold; color: #f1c40f; }
         
         /* LIVES DISPLAY */
-        .lives-bar { display: flex; gap: 15px; padding: 20px 30px; background: #243042; overflow-x: auto; border-bottom: 1px solid var(--border); align-items: center; }
-        .life-badge { background: #0f172a; padding: 8px 16px; border-radius: 8px; font-size: 0.9rem; display: flex; align-items: center; gap: 8px; border: 1px solid var(--border); font-weight: 600; white-space: nowrap; }
-        .life-dead { opacity: 0.6; text-decoration: line-through; border-color: var(--accent); color: var(--accent); }
+        .lives-bar { display: flex; gap: 15px; padding: 10px 20px; background: #222; overflow-x: auto; border-bottom: 1px solid #333; }
+        .life-badge { background: #444; padding: 5px 10px; border-radius: 15px; font-size: 0.8rem; display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
+        .life-dead { opacity: 0.5; text-decoration: line-through; }
         
         /* QUESTIONS LIST */
         .questions-list { padding: 0; }
-        .q-item { padding: 30px; border-bottom: 1px solid var(--border); transition: background 0.2s; }
-        .q-item:hover { background: #253146; }
+        .q-item { padding: 20px; border-bottom: 1px solid #3a3a3a; }
         .q-item:last-child { border-bottom: none; }
-        
-        .q-meta { font-size: 0.75rem; font-weight: 700; color: var(--primary); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
-        .q-text { font-size: 1.4rem; font-weight: 600; margin-bottom: 20px; color: var(--text-main); line-height: 1.4; }
-        
-        .q-correct { background: rgba(16, 185, 129, 0.1); color: var(--success); padding: 10px 15px; border-radius: 8px; display: inline-block; margin-bottom: 20px; font-weight: 600; border: 1px solid rgba(16, 185, 129, 0.2); }
+        .q-text { font-size: 1.1rem; font-weight: bold; margin-bottom: 10px; color: #ddd; }
+        .q-meta { font-size: 0.8rem; color: #888; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 1px; }
+        .q-correct { background: #1b4f25; color: #8fd19e; padding: 5px 10px; border-radius: 4px; display: inline-block; margin-bottom: 10px; font-size: 0.9rem;}
         
         /* ANSWERS GRID */
-        .answers-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 15px; }
-        .ans-card { background: #0f172a; padding: 15px; border-radius: 10px; border: 1px solid var(--border); }
-        .ans-user { font-size: 0.8rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; margin-bottom: 5px; }
-        .ans-val { color: var(--text-main); font-weight: 500; font-size: 1.05rem; white-space: pre-wrap; line-height: 1.4; }
+        .answers-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; }
+        .ans-card { background: #3a3a3a; padding: 10px; border-radius: 5px; }
+        .ans-user { font-size: 0.8rem; color: #aaa; font-weight: bold; margin-bottom: 3px; }
+        .ans-val { color: #fff; white-space: pre-wrap; font-size: 0.95rem;}
         
-        .loading { text-align: center; color: var(--text-muted); margin-top: 100px; font-style: italic; font-size: 1.2rem; }
-        .error-msg { text-align: center; color: var(--accent); margin-top: 50px; font-weight: bold; background: rgba(244, 63, 94, 0.1); padding: 20px; border-radius: 10px; display: inline-block; }
-        
-        /* SCROLLBAR */
-        ::-webkit-scrollbar { width: 8px; height: 8px; }
-        ::-webkit-scrollbar-track { background: var(--bg-dark); }
-        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+        .loading { text-align: center; color: #666; margin-top: 50px; font-style: italic; }
+        .error-msg { text-align: center; color: #e74c3c; margin-top: 50px; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -79,15 +55,14 @@
     <div class="sidebar">
         <div class="sidebar-header">SPIEL-ARCHIV</div>
         <div id="game-list">
-            <div class="loading" style="font-size:0.9rem; margin-top:20px;">Lade Spiele...</div>
+            <div class="loading">Lade Spiele...</div>
         </div>
     </div>
 
     <div class="content" id="content-area">
-        <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; color:var(--text-muted); text-align:center;">
-            <div style="font-size:4rem; margin-bottom:20px; opacity:0.2;">📊</div>
-            <h2 style="color:var(--text-main);">Wähle ein Spiel aus der Liste</h2>
-            <p>Klicke links auf ein Datum, um die Details zu laden.</p>
+        <div style="text-align:center; color:#555; margin-top:100px;">
+            <h2>Wähle ein Spiel aus der Liste</h2>
+            <p>Links klicken, um Details zu laden.</p>
         </div>
     </div>
 
@@ -95,7 +70,6 @@
     <script>
         const socket = io();
 
-        // 1. Init: Liste anfordern
         socket.on('connect', () => {
             console.log("Verbunden. Lade Liste...");
             socket.emit('request_gamelist');
@@ -106,7 +80,7 @@
             list.innerHTML = '';
             
             if(games.length === 0) {
-                list.innerHTML = '<div style="padding:30px; color:#64748b; text-align:center; font-size:0.9rem;">Keine Spiele gefunden.</div>';
+                list.innerHTML = '<div style="padding:20px; color:#666; text-align:center;">Keine Spiele gefunden.</div>';
                 return;
             }
 
@@ -114,14 +88,15 @@
                 const el = document.createElement('div');
                 el.className = 'game-item';
                 
+                // Datum sicher formatieren
                 let dateStr = "Unbekannt";
                 try {
-                    dateStr = new Date(game.date).toLocaleString('de-DE', { weekday: 'short', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute:'2-digit' });
+                    dateStr = new Date(game.date).toLocaleString('de-DE');
                 } catch(e) {}
 
                 el.innerHTML = `
                     <div class="game-date">${dateStr}</div>
-                    <div class="game-id"><span>🆔 ${game.id}</span> <span>👥 ${game.playersCount}</span></div>
+                    <div class="game-id">${game.id} • ${game.playersCount} Spieler</div>
                 `;
                 el.onclick = () => loadGame(game.id, el);
                 list.appendChild(el);
@@ -132,17 +107,18 @@
             document.querySelectorAll('.game-item').forEach(e => e.classList.remove('active'));
             element.classList.add('active');
             
-            document.getElementById('content-area').innerHTML = '<div class="loading">Lade Daten...</div>';
+            document.getElementById('content-area').innerHTML = '<div class="loading">Lade Daten für ' + gameId + '...</div>';
             
             socket.emit('request_game_details', gameId);
         }
 
         socket.on('receive_game_details', (data) => {
+            console.log("Details empfangen:", data);
             renderGameDetails(data.meta, data.rounds);
         });
 
         socket.on('error_details', (msg) => {
-            document.getElementById('content-area').innerHTML = `<div style="text-align:center;"><div class="error-msg">${msg}</div></div>`;
+            document.getElementById('content-area').innerHTML = `<div class="error-msg">${msg}</div>`;
         });
 
         function renderGameDetails(meta, rounds) {
@@ -150,23 +126,21 @@
             const players = meta.players || {};
             const pCount = Object.keys(players).length;
             
+            // Datum sicher parsen
             let dateStr = '-';
             try {
-                if (meta.lastUpdated) dateStr = new Date(meta.lastUpdated).toLocaleString('de-DE', { dateStyle: 'full', timeStyle: 'short' });
-            } catch (e) {}
+                if (meta.lastUpdated) dateStr = new Date(meta.lastUpdated).toLocaleString();
+            } catch (e) { console.error("Datumsfehler:", e); }
 
             let html = `
                 <div class="header">
                     <h1>Spiel vom ${dateStr}</h1>
-                    <div class="header-meta">
-                        <span>🆔 ${meta.gameId}</span>
-                        <span>👥 ${pCount} Spieler</span>
-                    </div>
+                    <div style="color:#888;">ID: ${meta.gameId} | ${pCount} Spieler</div>
                 </div>
             `;
 
             if (!rounds || rounds.length === 0) {
-                html += '<div style="text-align:center; color:#94a3b8; padding:40px; background:#1e293b; border-radius:12px; border:1px solid #334155;">Keine Runden-Daten verfügbar (oder Spiel wurde resettet).</div>';
+                html += '<div style="text-align:center; color:#666;">Keine Runden-Daten verfügbar (oder Spiel wurde resettet).</div>';
                 container.innerHTML = html;
                 return;
             }
@@ -177,7 +151,7 @@
                     for (const [name, lives] of Object.entries(round.playerLives)) {
                         const isDead = lives <= 0 ? 'life-dead' : '';
                         const heart = lives <= 0 ? '💀' : '❤️ ' + lives;
-                        livesHtml += `<div class="life-badge ${isDead}"><span>${name}</span> <span style="color:#e2e8f0;">${heart}</span></div>`;
+                        livesHtml += `<div class="life-badge ${isDead}">${name} ${heart}</div>`;
                     }
                 }
 
@@ -212,14 +186,14 @@
                         `;
                     });
                 } else {
-                    qHtml = '<div style="padding:30px; text-align:center; color:#64748b; font-style:italic;">Keine Fragen in dieser Runde.</div>';
+                    qHtml = '<div style="padding:20px; color:#666;">Keine Fragen in dieser Runde.</div>';
                 }
 
                 html += `
                     <div class="round-block">
                         <div class="round-header">
                             <span class="round-title">Runde ${round.roundId}</span>
-                            <span class="round-count">${round.questions ? round.questions.length : 0} Fragen</span>
+                            <span style="font-size:0.8rem; color:#888;">${round.questions ? round.questions.length : 0} Fragen</span>
                         </div>
                         <div class="lives-bar">${livesHtml}</div>
                         <div class="questions-list">${qHtml}</div>
@@ -232,7 +206,7 @@
 
         function formatVal(val) {
             if (val === null || val === undefined) return '-';
-            if (Array.isArray(val)) return val.join(' ➝ ');
+            if (Array.isArray(val)) return val.join(' → ');
             if (typeof val === 'object') {
                 let s = ''; 
                 for(const [k,v] of Object.entries(val)) s += `${k} ➝ ${v}\n`; 
