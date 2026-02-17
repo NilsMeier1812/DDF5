@@ -5,26 +5,55 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Voting Pad</title>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; margin: 0; padding: 0; background: #222; color: white; display: flex; height: 100vh; overflow: hidden; }
+        body { font-family: 'Segoe UI', sans-serif; margin: 0; padding: 0; background: #222; color: white; display: flex; height: 100vh; overflow: hidden; position: relative;}
         
-        /* SIDEBAR */
-        .sidebar { width: 140px; background: #333; border-right: 1px solid #444; display: flex; flex-direction: column; overflow-y: auto; flex-shrink: 0;}
-        .sidebar h3 { font-size: 0.9rem; padding: 15px; margin: 0; background: #444; text-align: center; color: #aaa; text-transform: uppercase; letter-spacing: 1px;}
-        .p-item { padding: 10px; border-bottom: 1px solid #444; font-size: 0.9rem; display: flex; justify-content: space-between; align-items: center; }
-        .p-name { font-weight: bold; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 80px;}
-        .answered-icon { width: 8px; height: 8px; background: #2ecc71; border-radius: 50%; display: none; }
+        /* HEADER MIT TOGGLE */
+        .q-header { margin-bottom: 20px; text-align: center; position: relative; width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        
+        /* TOGGLE BUTTON */
+        .sidebar-toggle { 
+            position: absolute; left: 0; top: 0; 
+            background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer; padding: 10px; z-index: 50;
+        }
+
+        /* SIDEBAR (OFF-CANVAS) */
+        .sidebar { 
+            width: 250px; background: #333; border-right: 1px solid #444; 
+            display: flex; flex-direction: column; overflow-y: auto; flex-shrink: 0;
+            position: absolute; top: 0; left: 0; height: 100%; z-index: 40;
+            transform: translateX(-100%); transition: transform 0.3s ease-in-out;
+            box-shadow: 5px 0 15px rgba(0,0,0,0.5);
+        }
+        .sidebar.open { transform: translateX(0); }
+        
+        /* Overlay zum Schließen der Sidebar auf Mobile */
+        .sidebar-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5); z-index: 30; display: none;
+        }
+        .sidebar-overlay.active { display: block; }
+
+        .sidebar h3 { font-size: 0.9rem; padding: 15px; margin: 0; background: #444; text-align: center; color: #aaa; text-transform: uppercase; letter-spacing: 1px; padding-top: 50px; /* Platz für Toggle */ }
+        .p-item { padding: 10px 15px; border-bottom: 1px solid #444; font-size: 0.9rem; display: flex; justify-content: space-between; align-items: center; }
+        .p-name { font-weight: bold; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100px;}
+        .p-status { display: flex; align-items: center; gap: 4px; color: #e74c3c; font-size: 1.1rem; }
+        .answered-icon { width: 8px; height: 8px; background: #2ecc71; border-radius: 50%; display: none; margin-right: 5px;}
         .answered-icon.visible { display: block; }
         
+        /* ELIMINATED PLAYER STYLE */
+        .p-item.eliminated { opacity: 0.5; background: #2a1a1a; }
+        .p-item.eliminated .p-name { text-decoration: line-through; color: #aaa; }
+        .p-item.eliminated .p-status { color: #555; font-size: 0.9rem; } /* Graue Herzen oder X */
+
         /* MAIN AREA */
-        .main-area { flex: 1; display: flex; flex-direction: column; padding: 20px; position: relative; overflow-y: auto; }
+        .main-area { flex: 1; display: flex; flex-direction: column; padding: 20px; position: relative; overflow-y: auto; width: 100%; padding-top: 50px; /* Platz für Header Buttons */ }
         
         #login-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #111; z-index: 2000; display: flex; flex-direction: column; justify-content: center; align-items: center; }
         .code-input { font-size: 2rem; padding: 10px; text-align: center; width: 120px; border-radius: 10px; border: none; margin-bottom: 20px; letter-spacing: 5px; color: black;}
         .btn-submit { background: #3498db; color: white; padding: 15px 30px; font-size: 1.2rem; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; }
 
-        .q-header { margin-bottom: 20px; text-align: center; }
         .round-indicator { color: #888; font-size: 0.9rem; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 2px; }
-        .q-text { font-size: 1.2rem; background: rgba(255,255,255,0.1); padding: 15px; border-radius: 10px; display: inline-block; min-width: 50%; }
+        .q-text { font-size: 1.2rem; background: rgba(255,255,255,0.1); padding: 15px; border-radius: 10px; display: inline-block; min-width: 50%; max-width: 90%; }
 
         .mode-container { display: none; height: 100%; flex-direction: column; }
         .mode-container.active { display: flex; }
@@ -48,7 +77,7 @@
         .history-item { margin-bottom: 8px; font-size: 0.9rem; border-bottom: 1px solid #333; padding-bottom: 5px; }
 
         .match-row, .seq-item { background: #333; padding: 10px; border-radius: 5px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;}
-        .match-select { color: black; padding: 5px; }
+        .match-select { color: black; padding: 5px; width: 50%; max-width: 200px; }
         .btn-move { background: #555; color: white; border: none; width: 30px; height: 30px; margin-left: 2px; cursor: pointer; border-radius: 4px; }
         .btn-move:disabled { opacity: 0.2; cursor: default; }
 
@@ -65,8 +94,12 @@
         #status-toast { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); background: #2ecc71; color: white; padding: 10px 20px; border-radius: 20px; font-weight: bold; display: none; z-index: 100; }
         #locked-screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 90; display: none; justify-content: center; align-items: center; flex-direction: column; text-align: center; }
         #locked-screen.visible { display: flex; }
-        #spectator-screen { text-align: center; padding: 40px; display: none; }
-        #spectator-screen.visible { display: block; }
+        
+        /* SPECTATOR SCREENS */
+        #spectator-screen, #eliminated-screen { text-align: center; padding: 40px; display: none; }
+        #spectator-screen.visible, #eliminated-screen.visible { display: block; }
+        
+        #eliminated-screen h2 { color: #e74c3c; font-size: 2rem; }
         
         .correct-answer-card { background: #f1c40f; color: #222; padding: 15px; border-radius: 8px; margin-bottom: 20px; text-align: center; border: 2px solid #f39c12; font-weight: bold; }
         
@@ -89,6 +122,15 @@
     <!-- Globale Audio Engine (versteckt) -->
     <audio id="global-audio-player" playsinline></audio>
 
+    <!-- Sidebar Overlay zum Klicken -->
+    <div class="sidebar-overlay" id="sidebar-overlay" onclick="toggleSidebar()"></div>
+
+    <!-- Sidebar -->
+    <div class="sidebar" id="sidebar">
+        <h3>Teilnehmer</h3>
+        <ul class="p-list" id="sidebar-list"></ul>
+    </div>
+
     <div id="login-overlay">
         <h2>Hallo <span id="welcome-name"></span></h2>
         <p style="color:#aaa;">Code eingeben:</p>
@@ -97,13 +139,10 @@
         <p id="login-msg" style="color: #e74c3c; margin-top: 10px; font-weight:bold;"></p>
     </div>
 
-    <div class="sidebar">
-        <h3>Leben</h3>
-        <ul class="p-list" id="sidebar-list"></ul>
-    </div>
-
     <div class="main-area">
+        <!-- HEADER MIT TOGGLE -->
         <div class="q-header">
+            <button class="sidebar-toggle" onclick="toggleSidebar()">👤</button>
             <div class="round-indicator" id="round-display">Runde 1</div>
             
             <!-- MEDIA BEREICH -->
@@ -125,7 +164,10 @@
 
         <div id="status-toast">✅ Gesendet!</div>
         <div id="locked-screen"><div style="font-size:3rem;">🔒</div><h3>Voting beendet</h3></div>
-        <div id="spectator-screen"><h2 style="color:#aaa;">Nur Zuschauer</h2></div>
+        
+        <!-- NEUE ZUSCHAUER SCREENS -->
+        <div id="spectator-screen"><h2 style="color:#aaa;">Nur Zuschauer</h2><p>Du nimmst an dieser Frage nicht teil.</p></div>
+        <div id="eliminated-screen"><h2>❌ Ausgeschieden</h2><p>Du hast keine Leben mehr.</p></div>
 
         <!-- MODES -->
         <div id="mode-results" class="mode-container"><div id="correct-answer-display"></div><h3 style="text-align:center; margin-top:0; color:#f39c12;">Antworten:</h3><div class="results-list" id="results-container"></div></div>
@@ -158,19 +200,26 @@
         const audioStatus = document.getElementById('audio-state-text');
         const btnEnableAudio = document.getElementById('btn-enable-audio');
 
-        function setVolume(val) {
-            audioPlayer.volume = val;
-        }
-
-        // Hilfsfunktion um Autoplay Blockaden zu umgehen
+        function setVolume(val) { audioPlayer.volume = val; }
         function enableAudio() {
             audioPlayer.play().then(() => {
                 btnEnableAudio.style.display = 'none';
                 audioStatus.innerText = "🔊 Audio bereit";
                 audioStatus.classList.remove('inactive');
-            }).catch(e => {
-                console.log("Audio immer noch blockiert oder leer");
-            });
+            }).catch(e => { console.log("Audio blockiert"); });
+        }
+
+        // SIDEBAR TOGGLE
+        function toggleSidebar() {
+            const sb = document.getElementById('sidebar');
+            const ov = document.getElementById('sidebar-overlay');
+            if(sb.classList.contains('open')) {
+                sb.classList.remove('open');
+                ov.classList.remove('active');
+            } else {
+                sb.classList.add('open');
+                ov.classList.add('active');
+            }
         }
 
         socket.on('connect', () => { 
@@ -179,43 +228,27 @@
             if (storedCode) setTimeout(() => socket.emit('player_login', { name: username, code: storedCode }), 100); 
         });
 
-        // --- AUDIO SYNC LOGIK (FERNSTEUERUNG) ---
         socket.on('audio_sync_command', (cmd) => {
-            // Nur reagieren, wenn eine Source gesetzt ist
             if (!audioPlayer.src) return;
-
             if (cmd.action === 'play') {
-                // Versuchen abzuspielen
                 audioPlayer.play().then(() => {
                     audioStatus.innerText = "▶️ Spielt ab...";
-                    btnEnableAudio.style.display = 'none'; // Alles gut
+                    btnEnableAudio.style.display = 'none'; 
                 }).catch(error => {
-                    console.log("Autoplay blockiert!", error);
-                    // Button anzeigen damit User klicken muss
                     btnEnableAudio.style.display = 'block';
                     audioStatus.innerText = "🔇 Blockiert (Klicken!)";
                 });
-                
-                // Sync Time wenn nötig (vermeide springen bei kleinen diffs)
-                if (Math.abs(audioPlayer.currentTime - cmd.currentTime) > 0.5) {
-                    audioPlayer.currentTime = cmd.currentTime;
-                }
+                if (Math.abs(audioPlayer.currentTime - cmd.currentTime) > 0.5) audioPlayer.currentTime = cmd.currentTime;
             } 
-            else if (cmd.action === 'pause') {
-                audioPlayer.pause();
-                audioStatus.innerText = "⏸️ Pausiert (Gamemaster)";
-            }
-            else if (cmd.action === 'seek') {
-                audioPlayer.currentTime = cmd.currentTime;
-            }
+            else if (cmd.action === 'pause') { audioPlayer.pause(); audioStatus.innerText = "⏸️ Pausiert (GM)"; }
+            else if (cmd.action === 'seek') { audioPlayer.currentTime = cmd.currentTime; }
         });
 
-        // LOGIN
         function submitLogin() { const code = document.getElementById('player-code').value; socket.emit('player_login', { name: username, code: code }); }
         socket.on('player_login_success', () => { document.getElementById('login-overlay').style.display = 'none'; const inputCode = document.getElementById('player-code').value; if (inputCode) localStorage.setItem(STORAGE_KEY, inputCode); });
         socket.on('player_login_fail', (msg) => { document.getElementById('login-msg').innerText = msg || "Falscher Code"; localStorage.removeItem(STORAGE_KEY); document.getElementById('login-overlay').style.display = 'flex'; });
         
-        // GAME STATE
+        // GAME STATE UPDATE
         socket.on('update_game_state', (data) => {
             if (localGameId && localGameId !== data.gameId) { localStorage.removeItem(STORAGE_KEY); localGameId = data.gameId; document.getElementById('login-overlay').style.display = 'flex'; document.getElementById('player-code').value = ''; document.getElementById('login-msg').innerText = "Neues Spiel gestartet!"; socket.emit('player_announce', username); return; }
             localGameId = data.gameId;
@@ -224,8 +257,31 @@
             if (!me && document.getElementById('login-overlay').style.display === 'none') { socket.emit('player_announce', username); return; }
             if (document.getElementById('login-overlay').style.display !== 'none') return;
             
+            // --- ELIMINATION CHECK ---
+            if (me && me.lives <= 0) {
+                hideAllModes();
+                document.getElementById('eliminated-screen').classList.add('visible');
+                document.getElementById('spectator-screen').classList.remove('visible');
+                document.getElementById('locked-screen').classList.remove('visible');
+                // Wenn RESULTS offen sind, wollen wir die vielleicht trotzdem sehen?
+                if (round.revealed) {
+                    // Option: Trotzdem Ergebnisse zeigen
+                    document.getElementById('eliminated-screen').classList.remove('visible');
+                    switchMode('RESULTS', round, data.players);
+                }
+                return;
+            } else {
+                document.getElementById('eliminated-screen').classList.remove('visible');
+            }
+
+            // --- SPECTATOR CHECK (STECHEN) ---
             const isSpectator = round.targetPlayers && round.targetPlayers.length > 0 && !round.targetPlayers.includes(username);
-            if (isSpectator && !round.revealed) { hideAllModes(); document.getElementById('spectator-screen').classList.add('visible'); document.getElementById('locked-screen').classList.remove('visible'); return; } else { document.getElementById('spectator-screen').classList.remove('visible'); }
+            if (isSpectator && !round.revealed) { 
+                hideAllModes(); document.getElementById('spectator-screen').classList.add('visible'); document.getElementById('locked-screen').classList.remove('visible'); return; 
+            } else { 
+                document.getElementById('spectator-screen').classList.remove('visible'); 
+            }
+
             if (round.revealed) { document.getElementById('locked-screen').classList.remove('visible'); document.getElementById('status-toast').style.display = 'none'; switchMode('RESULTS', round, data.players); return; }
             if (!round.answeringOpen && round.type !== 'WAITING') { document.getElementById('locked-screen').classList.add('visible'); document.getElementById('status-toast').style.display = 'none'; return; } else { document.getElementById('locked-screen').classList.remove('visible'); }
             if (me && me.hasAnswered) document.getElementById('status-toast').style.display = 'block'; else document.getElementById('status-toast').style.display = 'none';
@@ -234,35 +290,52 @@
             if (currentSignature !== lastRoundSignature) { lastRoundSignature = currentSignature; switchMode(round.type, round, data.players); } else { if (round.type === 'PLAYER_VOTE') renderPlayerCards(data.players); }
         });
 
+        // --- RENDER SIDEBAR MIT HERZEN ---
         function renderSidebar(players) {
             const list = document.getElementById('sidebar-list'); list.innerHTML = '';
             for (const [name, p] of Object.entries(players)) { 
-                const li = document.createElement('li'); li.className = 'p-item'; li.innerHTML = `<div class="p-name">${name}</div><div class="p-status"><span class="answered-icon ${p.hasAnswered ? 'visible' : ''}"></span><span style="color:#e74c3c">❤️</span> ${p.lives}</div>`; list.appendChild(li); 
+                const li = document.createElement('li'); 
+                
+                // Style für Eliminierte
+                if (p.lives <= 0) li.classList.add('eliminated');
+                li.className = p.lives <= 0 ? 'p-item eliminated' : 'p-item';
+
+                // Herzen String bauen
+                let hearts = "";
+                if(p.lives <= 0) hearts = "❌";
+                else {
+                    for(let i=0; i<p.lives; i++) hearts += "❤️ ";
+                }
+
+                li.innerHTML = `
+                    <div class="p-name">${name}</div>
+                    <div class="p-status">
+                        <span class="answered-icon ${p.hasAnswered ? 'visible' : ''}"></span>
+                        <span style="font-size:0.8rem;">${hearts}</span>
+                    </div>`; 
+                list.appendChild(li); 
             }
         }
+
         function hideAllModes() { document.querySelectorAll('.mode-container').forEach(el => el.classList.remove('active')); }
         
         function switchMode(type, roundData, allPlayers) {
             hideAllModes(); 
             document.getElementById('display-question').innerText = roundData.question || "Pause";
             
-            // AUDIO SETUP
+            // AUDIO
+            const audioDiv = document.getElementById('audio-container');
             if (roundData.audioData) {
                 audioUI.style.display = 'block';
-                // Nur Source ändern wenn neu, um flackern/reset zu vermeiden
-                // Wir speichern den Hash/URL im Dataset
                 const currentSrc = audioPlayer.getAttribute('data-src');
                 if (currentSrc !== roundData.audioData) {
                     audioPlayer.src = roundData.audioData;
                     audioPlayer.setAttribute('data-src', roundData.audioData);
                     audioPlayer.load();
-                    audioStatus.innerText = "⏳ Audio geladen. Warte auf GM...";
+                    audioStatus.innerText = "⏳ Audio geladen.";
                 }
             } else {
-                audioUI.style.display = 'none';
-                audioPlayer.pause();
-                audioPlayer.src = "";
-                audioPlayer.removeAttribute('data-src');
+                audioUI.style.display = 'none'; audioPlayer.pause(); audioPlayer.src = ""; audioPlayer.removeAttribute('data-src');
             }
 
             // IMAGE
@@ -342,7 +415,10 @@
             let count = 0;
             for (const name in players) {
                 if(name === username) continue;
-                // FIX: Entferne die !players[name].isVerified Prüfung
+                if(!players[name].isVerified) continue;
+                // FILTER: Eliminierte Spieler nicht anzeigen
+                if(players[name].lives <= 0) continue;
+
                 count++;
                 let historyHTML = '';
                 if (!currentHistory || currentHistory.length === 0) { historyHTML = '<div class="history-item" style="color:#666">Keine Fragen bisher in dieser Runde.</div>'; } 
@@ -356,7 +432,7 @@
                 card.innerHTML = `<div class="vote-card-header"><div class="vote-name">${name}</div><button class="btn-inspect" onclick="toggleHistory(this)">👁️</button><button class="btn-vote-action" onclick="sendAnswer('${name}')">VOTE</button></div><div class="vote-history">${historyHTML}</div>`;
                 container.appendChild(card);
             }
-            if(count === 0) { container.innerHTML = `<div style="text-align:center; color:#666; padding:20px;">Warte auf andere Spieler...<br>(Du bist der Einzige hier)</div>`; }
+            if(count === 0) { container.innerHTML = `<div style="text-align:center; color:#666; padding:20px;">Warte auf andere Spieler...<br>(Oder du bist der Einzige, der noch lebt)</div>`; }
         }
         
         window.toggleHistory = function(btn) { const h = btn.parentElement.nextElementSibling; if (h.classList.contains('show')) { h.classList.remove('show'); btn.style.background="#444"; } else { h.classList.add('show'); btn.style.background="#555"; } };
