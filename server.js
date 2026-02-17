@@ -110,6 +110,10 @@ io.on('connection', (socket) => {
     const broadcastStatus = () => {
         const publicPlayers = {};
         for (const [name, data] of Object.entries(players)) {
+            // FILTER: Nur verifizierte Spieler (die den Code eingegeben haben)
+            // werden an die Öffentlichkeit gesendet.
+            if (!data.isVerified) continue;
+
             const answerVisible = currentRound.revealed ? data.answer : null;
             publicPlayers[name] = { 
                 lives: data.lives, 
@@ -127,6 +131,7 @@ io.on('connection', (socket) => {
             gameId: currentGameId
         });
 
+        // GM bekommt ALLE Spieler (auch die Pending)
         io.to('gamemaster_room').emit('gm_update_full', {
             round: currentRound,
             players: players,
@@ -152,7 +157,6 @@ io.on('connection', (socket) => {
         broadcastStatus();
     });
 
-    // --- GAME CONTROL ---
     socket.on('gm_close_answering', () => {
         currentRound.answeringOpen = false;
         saveGame();
@@ -225,9 +229,8 @@ io.on('connection', (socket) => {
         }
     });
 
-    // --- PLAYER MANAGEMENT ---
+    // --- PLAYER JOINING ---
     
-    // 1. Manuell erstellt vom GM
     socket.on('gm_create_player', (name) => {
         if (!name) return;
         const code = Math.floor(1000 + Math.random() * 9000).toString();
@@ -235,35 +238,28 @@ io.on('connection', (socket) => {
         if (!players[name]) {
             players[name] = { 
                 code: code,
-                lives: 3, hasAnswered: false, answer: null, connected: false
+                lives: 3, hasAnswered: false, answer: null, connected: false,
+                isVerified: false // Warten auf Login
             };
             saveGame();
-            socket.emit('gm_player_joined', { name, code, isManual: true });
             broadcastStatus();
         }
     });
 
-    // 2. Automatisch durch URL Aufruf (WICHTIG: Hier fehlte die Benachrichtigung)
     socket.on('player_announce', (name) => {
-        let isNew = false;
-        
         if (!players[name]) {
-            // Spieler existiert noch nicht -> Neu anlegen
+            // Neuer Spieler -> Pending State
             players[name] = { 
                 code: Math.floor(1000 + Math.random() * 9000).toString(),
-                lives: 3, hasAnswered: false, answer: null, connected: true
+                lives: 3, hasAnswered: false, answer: null, connected: true,
+                isVerified: false // <--- WICHTIG: Noch nicht sichtbar für andere
             };
             saveGame();
-            isNew = true;
+            // Optional: Einmaliges Toast Event, wenn wirklich neu
+            io.to('gamemaster_room').emit('gm_player_joined', { name, code: players[name].code, isManual: false });
         } else {
             players[name].connected = true;
         }
-        
-        // Benachrichtigung an GM senden, wenn es ein neuer Spieler ist
-        if (isNew) {
-            io.to('gamemaster_room').emit('gm_player_joined', { name, code: players[name].code, isManual: false });
-        }
-        
         broadcastStatus();
     });
 
@@ -271,8 +267,10 @@ io.on('connection', (socket) => {
         const { name, code } = data;
         if (players[name] && String(players[name].code) === String(code)) {
             players[name].connected = true;
+            players[name].isVerified = true; // <--- JETZT sichtbar für alle
             socket.emit('player_login_success');
             if (players[name].hasAnswered) socket.emit('answer_confirmed');
+            saveGame(); // Status speichern
             broadcastStatus();
         } else {
             socket.emit('player_login_fail');
