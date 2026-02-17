@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spiel-Auswertung</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; background: #1a1a1a; color: #e0e0e0; display: flex; height: 100vh; }
+        
+        /* SIDEBAR (GAME LIST) */
+        .sidebar { width: 300px; background: #252525; border-right: 1px solid #444; overflow-y: auto; display: flex; flex-direction: column;}
+        .sidebar-header { padding: 20px; background: #111; color: #3498db; text-align: center; font-weight: bold; border-bottom: 1px solid #333; }
+        .game-item { padding: 15px 20px; border-bottom: 1px solid #333; cursor: pointer; transition: background 0.2s; }
+        .game-item:hover { background: #333; }
+        .game-item.active { background: #3498db; color: white; border-left: 5px solid #fff; }
+        .game-date { font-size: 0.9rem; font-weight: bold; }
+        .game-id { font-size: 0.7rem; color: #888; font-family: monospace; }
+        .game-item.active .game-id { color: #ddd; }
+
+        /* MAIN CONTENT */
+        .content { flex: 1; padding: 40px; overflow-y: auto; }
+        .header { margin-bottom: 30px; border-bottom: 1px solid #444; padding-bottom: 10px; }
+        .header h1 { margin: 0; font-size: 2rem; color: #fff; }
+        
+        /* ROUND BLOCK */
+        .round-block { background: #2c2c2c; margin-bottom: 30px; border-radius: 10px; overflow: hidden; border: 1px solid #444; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+        .round-header { background: #333; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #444; }
+        .round-title { font-size: 1.2rem; font-weight: bold; color: #f1c40f; }
+        
+        /* LIVES DISPLAY */
+        .lives-bar { display: flex; gap: 15px; padding: 10px 20px; background: #222; overflow-x: auto; border-bottom: 1px solid #333; }
+        .life-badge { background: #444; padding: 5px 10px; border-radius: 15px; font-size: 0.8rem; display: flex; align-items: center; gap: 5px; }
+        .life-dead { opacity: 0.5; text-decoration: line-through; }
+        
+        /* QUESTIONS LIST */
+        .questions-list { padding: 0; }
+        .q-item { padding: 20px; border-bottom: 1px solid #3a3a3a; }
+        .q-item:last-child { border-bottom: none; }
+        .q-text { font-size: 1.1rem; font-weight: bold; margin-bottom: 10px; color: #ddd; }
+        .q-meta { font-size: 0.8rem; color: #888; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 1px; }
+        .q-correct { background: #1b4f25; color: #8fd19e; padding: 5px 10px; border-radius: 4px; display: inline-block; margin-bottom: 10px; font-size: 0.9rem;}
+        
+        /* ANSWERS GRID */
+        .answers-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+        .ans-card { background: #3a3a3a; padding: 10px; border-radius: 5px; }
+        .ans-user { font-size: 0.8rem; color: #aaa; font-weight: bold; margin-bottom: 3px; }
+        .ans-val { color: #fff; white-space: pre-wrap; }
+        
+        .loading { text-align: center; color: #666; margin-top: 50px; font-style: italic; }
+    </style>
+</head>
+<body>
+
+    <div class="sidebar">
+        <div class="sidebar-header">SPIEL-ARCHIV</div>
+        <div id="game-list">
+            <div class="loading">Lade Spiele...</div>
+        </div>
+    </div>
+
+    <div class="content" id="content-area">
+        <div style="text-align:center; color:#555; margin-top:100px;">
+            <h2>Wähle ein Spiel aus der Liste</h2>
+            <p>Links klicken, um Details zu laden.</p>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+
+        // 1. Init: Liste anfordern
+        socket.on('connect', () => {
+            socket.emit('request_gamelist');
+        });
+
+        socket.on('receive_gamelist', (games) => {
+            const list = document.getElementById('game-list');
+            list.innerHTML = '';
+            
+            if(games.length === 0) {
+                list.innerHTML = '<div style="padding:20px; color:#666; text-align:center;">Keine Spiele gefunden.</div>';
+                return;
+            }
+
+            games.forEach((game, index) => {
+                const el = document.createElement('div');
+                el.className = 'game-item';
+                if(index === 0) el.classList.add('active'); // Erstes markieren? Nein, lieber User klicken lassen.
+                
+                const date = new Date(game.date).toLocaleString('de-DE');
+                el.innerHTML = `
+                    <div class="game-date">${date}</div>
+                    <div class="game-id">${game.id} • ${game.playersCount} Spieler</div>
+                `;
+                el.onclick = () => loadGame(game.id, el);
+                list.appendChild(el);
+            });
+        });
+
+        function loadGame(gameId, element) {
+            // UI Active State
+            document.querySelectorAll('.game-item').forEach(e => e.classList.remove('active'));
+            element.classList.add('active');
+            
+            document.getElementById('content-area').innerHTML = '<div class="loading">Lade Daten...</div>';
+            
+            socket.emit('request_game_details', gameId);
+        }
+
+        socket.on('receive_game_details', (data) => {
+            renderGameDetails(data.meta, data.rounds);
+        });
+
+        function renderGameDetails(meta, rounds) {
+            const container = document.getElementById('content-area');
+            const players = meta.players || {};
+            const pCount = Object.keys(players).length;
+            const dateStr = meta.lastUpdated ? new Date(meta.lastUpdated.toDate()).toLocaleString() : '-';
+
+            let html = `
+                <div class="header">
+                    <h1>Spiel vom ${dateStr}</h1>
+                    <div style="color:#888;">ID: ${meta.gameId} | ${pCount} Spieler</div>
+                </div>
+            `;
+
+            if (!rounds || rounds.length === 0) {
+                html += '<div style="text-align:center; color:#666;">Keine Runden-Daten verfügbar.</div>';
+                container.innerHTML = html;
+                return;
+            }
+
+            rounds.forEach(round => {
+                // Lives Header
+                let livesHtml = '';
+                if (round.playerLives) {
+                    for (const [name, lives] of Object.entries(round.playerLives)) {
+                        const isDead = lives <= 0 ? 'life-dead' : '';
+                        const heart = lives <= 0 ? '💀' : '❤️ ' + lives;
+                        livesHtml += `<div class="life-badge ${isDead}">${name} ${heart}</div>`;
+                    }
+                }
+
+                // Questions
+                let qHtml = '';
+                if (round.questions) {
+                    round.questions.forEach((q, qIndex) => {
+                        let solHtml = '';
+                        if (q.correctAnswer) {
+                            let sol = formatVal(q.correctAnswer);
+                            solHtml = `<div class="q-correct">Lösung: ${sol}</div>`;
+                        }
+
+                        let answersHtml = '';
+                        if (q.answers) {
+                            for (const [user, ans] of Object.entries(q.answers)) {
+                                answersHtml += `
+                                    <div class="ans-card">
+                                        <div class="ans-user">${user}</div>
+                                        <div class="ans-val">${formatVal(ans)}</div>
+                                    </div>
+                                `;
+                            }
+                        }
+
+                        qHtml += `
+                            <div class="q-item">
+                                <div class="q-meta">Frage ${qIndex + 1} • ${q.type || 'TEXT'}</div>
+                                <div class="q-text">${q.question}</div>
+                                ${solHtml}
+                                <div class="answers-grid">${answersHtml}</div>
+                            </div>
+                        `;
+                    });
+                }
+
+                html += `
+                    <div class="round-block">
+                        <div class="round-header">
+                            <span class="round-title">Runde ${round.roundId}</span>
+                            <span style="font-size:0.8rem; color:#888;">${round.questions ? round.questions.length : 0} Fragen</span>
+                        </div>
+                        <div class="lives-bar">${livesHtml}</div>
+                        <div class="questions-list">${qHtml}</div>
+                    </div>
+                `;
+            });
+
+            container.innerHTML = html;
+        }
+
+        function formatVal(val) {
+            if (val === null || val === undefined) return '-';
+            if (Array.isArray(val)) return val.join(' → ');
+            if (typeof val === 'object') {
+                let s = ''; 
+                for(const [k,v] of Object.entries(val)) s += `${k} ➝ ${v}\n`; 
+                return s;
+            }
+            return val;
+        }
+
+    </script>
+</body>
+</html>
