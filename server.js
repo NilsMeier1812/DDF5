@@ -41,7 +41,9 @@ const DEFAULT_ROUND = {
     correctAnswer: null,
     audioData: null, 
     imageData: null,
-    powerVoter: []
+    powerVoter: [],
+    startTime: null, // NEU: Zeitstempel für Timer-Start
+    endTime: null    // NEU: Zeitstempel für Timer-Stop
 };
 let currentRound = { ...DEFAULT_ROUND };
 let sessionHistory = [];
@@ -151,7 +153,6 @@ io.on('connection', (socket) => {
             const publicPlayers = {};
             for (const [name, data] of Object.entries(players)) {
                 if (!data.isVerified) continue;
-                // Answer nur zeigen, wenn revealed
                 const answerVisible = currentRound.revealed ? data.answer : null;
                 publicPlayers[name] = { 
                     lives: data.lives, 
@@ -208,18 +209,11 @@ io.on('connection', (socket) => {
 
     socket.on('request_game_details', async (gameId) => {
         try {
-            console.log(`Lade Details für ${gameId}...`);
             const docRef = db.collection('games').doc(gameId);
             const doc = await docRef.get();
-            
-            if (!doc.exists) {
-                console.log("Spiel nicht gefunden.");
-                socket.emit('error_details', "Spiel nicht gefunden.");
-                return;
-            }
+            if (!doc.exists) { socket.emit('error_details', "Spiel nicht gefunden."); return; }
 
             const gameData = doc.data();
-            
             if(gameData.lastUpdated && typeof gameData.lastUpdated.toDate === 'function') {
                 gameData.lastUpdated = gameData.lastUpdated.toDate(); 
             }
@@ -228,16 +222,12 @@ io.on('connection', (socket) => {
             const rounds = [];
             roundsSnap.forEach(r => rounds.push(r.data()));
 
-            socket.emit('receive_game_details', {
-                meta: gameData,
-                rounds: rounds
-            });
+            socket.emit('receive_game_details', { meta: gameData, rounds: rounds });
         } catch (e) {
             console.error("Fehler bei Game Details:", e);
             socket.emit('error_details', "Fehler beim Laden der Daten.");
         }
     });
-
 
     // --- GM COMMANDS ---
     socket.on('gm_login', (pw) => {
@@ -331,7 +321,9 @@ io.on('connection', (socket) => {
             imageData: data.imageData || null,
             powerVoter: data.powerVoter || [],
             revealed: false,
-            answeringOpen: true 
+            answeringOpen: true,
+            startTime: Date.now(), // Timer startet
+            endTime: null
         };
         
         for (let p in players) {
@@ -359,22 +351,24 @@ io.on('connection', (socket) => {
     }
 
     socket.on('gm_close_answering', () => { 
-        currentRound.answeringOpen = false; 
+        currentRound.answeringOpen = false;
+        currentRound.endTime = Date.now(); // Timer stoppt
         saveGame(); 
         broadcastState(); 
     });
 
-    // NEU: Feature um Voting wieder zu öffnen
     socket.on('gm_open_answering', () => { 
         currentRound.answeringOpen = true; 
         currentRound.revealed = false; 
+        currentRound.endTime = null; // Timer läuft weiter
         saveGame(); 
         broadcastState(); 
     });
     
     socket.on('gm_reveal', () => { 
         currentRound.revealed = true; 
-        currentRound.answeringOpen = false; 
+        currentRound.answeringOpen = false;
+        if(!currentRound.endTime) currentRound.endTime = Date.now(); // Timer stoppt falls noch nicht gestoppt
         saveGame(); 
         broadcastState(); 
     });
