@@ -41,7 +41,8 @@ const DEFAULT_ROUND = {
     revealed: false, answeringOpen: false, 
     correctAnswer: null,
     audioData: null, 
-    imageData: null 
+    imageData: null,
+    powerVoter: [] // NEU: Array für mehrere Power Voter
 };
 let currentRound = { ...DEFAULT_ROUND };
 let sessionHistory = [];
@@ -96,19 +97,18 @@ async function loadGameData() {
             const data = doc.data();
             players = data.players || {};
             
-            // WICHTIG: AudioData/ImageData wiederherstellen (sind nicht in DB)
             const loadedRound = data.currentRound || {};
             currentRound = { 
                 ...DEFAULT_ROUND, 
                 ...loadedRound, 
                 audioData: null, 
-                imageData: null 
+                imageData: null,
+                powerVoter: loadedRound.powerVoter || [] // Sicherstellen dass es ein Array ist
             };
             
             sessionHistory = data.sessionHistory || [];
             globalRoundCounter = data.globalRoundCounter || 1;
             
-            // Alle auf offline setzen beim Start
             for (let p in players) players[p].connected = false;
             console.log(`📥 Daten geladen. ${Object.keys(players).length} Spieler.`);
         } else {
@@ -120,7 +120,6 @@ async function loadGameData() {
 }
 
 function saveGame() {
-    // TRICK: Kopie OHNE Audio/Bild für die Datenbank
     const roundToSave = { ...currentRound };
     delete roundToSave.audioData; 
     delete roundToSave.imageData; 
@@ -178,10 +177,8 @@ io.on('connection', (socket) => {
         }
     };
 
-    // --- GM LOGIN ---
     socket.on('gm_login', (pw) => {
         console.log(`🔑 Login Versuch mit: '${pw}'`);
-        // Trim entfernt Leerzeichen am Anfang/Ende
         if (pw && pw.trim() === GM_PASSWORD) {
             socket.join('gamemaster_room');
             socket.emit('gm_login_success');
@@ -202,6 +199,18 @@ io.on('connection', (socket) => {
 
     socket.on('gm_audio_sync', (data) => {
         io.emit('audio_sync_command', data);
+    });
+
+    // --- MANUELLE EINGABE VOM GM (OFFLINE GAMES) ---
+    socket.on('gm_set_bulk_answers', (answersMap) => {
+        for (const [name, val] of Object.entries(answersMap)) {
+            if (players[name]) {
+                players[name].answer = val;
+                players[name].hasAnswered = true;
+            }
+        }
+        saveGame();
+        broadcastState();
     });
 
     socket.on('gm_next_round_phase', () => {
@@ -262,6 +271,7 @@ io.on('connection', (socket) => {
             correctAnswer: correctAnswer, 
             audioData: data.audioData || null, 
             imageData: data.imageData || null,
+            powerVoter: data.powerVoter || [], // NEU: Array
             revealed: false,
             answeringOpen: true 
         };
@@ -298,7 +308,6 @@ io.on('connection', (socket) => {
             let newLives = players[data.user].lives + data.amount;
             if (newLives > 5) newLives = 5;
             if (newLives < 0) newLives = 0;
-            
             players[data.user].lives = newLives; 
             saveGame(); 
             broadcastState(); 
@@ -346,9 +355,7 @@ io.on('connection', (socket) => {
     socket.on('submit_answer', (data) => {
         const p = players[data.user];
         if (!p || !p.isVerified) return;
-        
-        if (p.lives <= 0) return; // Tote können nicht wählen
-
+        if (p.lives <= 0) return;
         if (currentRound.targetPlayers?.length > 0 && !currentRound.targetPlayers.includes(data.user)) return;
         if (currentRound.answeringOpen) {
             p.answer = data.answer;
