@@ -23,7 +23,11 @@ const META_DOC_REF = db.collection('settings').doc('server_state');
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, { cors: { origin: "*" } });
+// Erhöhtes Limit für Bilder via Socket
+const io = new Server(server, { 
+    cors: { origin: "*" },
+    maxHttpBufferSize: 1e7 // 10 MB Limit für Uploads
+});
 
 const GM_PASSWORD = "admin"; 
 
@@ -35,7 +39,9 @@ let currentRound = {
     options: [], pairs: [], shuffledRight: [], targetPlayers: [], 
     min: 0, max: 100, 
     revealed: false, answeringOpen: false, 
-    correctAnswer: null 
+    correctAnswer: null,
+    audioData: null, // RAM only
+    imageData: null  // NEU: RAM only
 };
 let sessionHistory = [];
 let globalRoundCounter = 1;
@@ -71,7 +77,7 @@ async function initServer() {
 async function startNewGameInternal() {
     currentGameId = `game_${Date.now()}`;
     players = {};
-    currentRound = { type: 'WAITING', question: '', revealed: false, answeringOpen: false, options: [], pairs: [], targetPlayers: [], correctAnswer: null };
+    currentRound = { type: 'WAITING', question: '', revealed: false, answeringOpen: false, options: [], pairs: [], targetPlayers: [], correctAnswer: null, audioData: null, imageData: null };
     sessionHistory = [];
     globalRoundCounter = 1;
     await META_DOC_REF.set({ activeGameId: currentGameId });
@@ -83,7 +89,8 @@ async function loadGameData() {
     if (doc.exists) {
         const data = doc.data();
         players = data.players || {};
-        currentRound = data.currentRound || { type: 'WAITING', question: '', revealed: false, answeringOpen: false };
+        // Restore defaults (Audio/Image ist null beim Laden aus DB)
+        currentRound = data.currentRound || { type: 'WAITING', question: '', revealed: false, answeringOpen: false, audioData: null, imageData: null };
         sessionHistory = data.sessionHistory || [];
         globalRoundCounter = data.globalRoundCounter || 1;
         for (let p in players) players[p].connected = false;
@@ -93,9 +100,17 @@ async function loadGameData() {
 }
 
 function saveGame() {
+    // TRICK: Kopie OHNE Audio/Bild für die Datenbank
+    const roundToSave = { ...currentRound };
+    delete roundToSave.audioData; 
+    delete roundToSave.imageData; // Löschen
+
     getGameDoc().set({
         gameId: currentGameId,
-        players, currentRound, sessionHistory, globalRoundCounter,
+        players, 
+        currentRound: roundToSave,
+        sessionHistory, 
+        globalRoundCounter,
         lastUpdated: admin.firestore.FieldValue.serverTimestamp()
     }).catch(e => console.error("Save Error:", e));
 }
@@ -124,7 +139,7 @@ io.on('connection', (socket) => {
         
         io.emit('update_game_state', {
             gameId: currentGameId,
-            round: currentRound,
+            round: currentRound, // Sendet audioData & imageData an Clients!
             players: publicPlayers,
             history: sessionHistory,
             roundNumber: globalRoundCounter
@@ -155,7 +170,10 @@ io.on('connection', (socket) => {
         broadcastState();
     });
 
-    // --- GAME FLOW ---
+    socket.on('gm_audio_sync', (data) => {
+        io.emit('audio_sync_command', data);
+    });
+
     socket.on('gm_next_round_phase', () => {
         archiveCurrentQuestion();
         
@@ -174,7 +192,8 @@ io.on('connection', (socket) => {
         
         currentRound = {
             type: 'WAITING', question: 'Runde beendet.', revealed: false, answeringOpen: false, 
-            options: [], pairs: [], targetPlayers: [], correctAnswer: null, shuffledRight: []
+            options: [], pairs: [], targetPlayers: [], correctAnswer: null, shuffledRight: [], 
+            audioData: null, imageData: null
         };
         
         for (let p in players) {
@@ -215,6 +234,8 @@ io.on('connection', (socket) => {
             min: data.min !== undefined ? Number(data.min) : 0,
             max: data.max !== undefined ? Number(data.max) : 100,
             correctAnswer: correctAnswer, 
+            audioData: data.audioData || null, 
+            imageData: data.imageData || null, // NEU
             revealed: false,
             answeringOpen: true 
         };
@@ -224,13 +245,11 @@ io.on('connection', (socket) => {
             players[p].answer = null;
         }
         
-        saveGame();
-        broadcastState();
+        saveGame(); 
+        broadcastState(); 
     });
 
     function archiveCurrentQuestion() {
-        // WICHTIG: Auch PLAYER_VOTE wird archiviert, wenn danach "Neue Runde" kommt
-        // Nur WAITING wird ignoriert
         if (currentRound.type !== 'WAITING') {
             const roundAnswers = {};
             for(const [name, p] of Object.entries(players)) {
