@@ -185,6 +185,7 @@
                     <div id="q-text">Warte auf Start...</div>
                     <div id="gm-image-wrapper" style="margin-top:20px; display:none;"><img id="gm-image-display" src="" style="max-height:250px; border-radius:8px; border:1px solid #e5e7eb;"></div>
                     <div id="gm-audio-wrapper" style="margin-top:15px; display:none; background:#f3f4f6; padding:10px; border-radius:8px;"><audio id="gm-audio-player" controls style="width:100%;"></audio></div>
+                    <div id="gm-video-wrapper" style="margin-top:20px; display:none; background:#000; color:#fff; padding:10px; border-radius:8px; text-align:center;">▶️ YouTube Stream Aktiv (ID: <span id="gm-video-id"></span>)</div>
                 </div>
                 <div class="stats-col">
                     <div class="timer-box" id="timer-display">00:00</div>
@@ -221,6 +222,7 @@
                     <option value="MATCHING">Zuordnen (Paare)</option>
                     <option value="TEXT">Freitext</option>
                     <option value="PLAYER_VOTE">Voting (Leben abziehen)</option>
+                    <option value="VIDEO_STREAM">🔴 YouTube Stream (Live)</option>
                     <option value="OFFLINE_RESULTS">Ergebnisse extern</option>
                 </select>
             </div>
@@ -228,6 +230,13 @@
             <div>
                 <label>Fragetext / Titel</label>
                 <input type="text" id="m-question" placeholder="Was ist die Hauptstadt von...">
+            </div>
+
+            <!-- YouTube Box -->
+            <div id="yt-config-box" style="display:none; background:#ff000010; padding:15px; border-radius:8px; border:1px solid #ff000030;">
+                <label style="color:red;">🔴 YouTube Link</label>
+                <input type="text" id="m-yt-link" placeholder="https://www.youtube.com/watch?v=...">
+                <small style="color:#666;">Unterstützt normale Links und Share-Links. Wird bei den Spielern automatisch eingebettet.</small>
             </div>
 
             <div class="media-box">
@@ -299,6 +308,8 @@
         const gmAudioWrapper = document.getElementById('gm-audio-wrapper');
         const gmImageWrapper = document.getElementById('gm-image-wrapper');
         const gmImage = document.getElementById('gm-image-display');
+        const gmVideoWrapper = document.getElementById('gm-video-wrapper'); // NEU
+        
         gmAudio.onplay = () => socket.emit('gm_audio_sync', { action: 'play', currentTime: gmAudio.currentTime });
         gmAudio.onpause = () => socket.emit('gm_audio_sync', { action: 'pause', currentTime: gmAudio.currentTime });
         gmAudio.onseeked = () => { if(gmAudio.paused) socket.emit('gm_audio_sync', { action: 'seek', currentTime: gmAudio.currentTime }); };
@@ -309,12 +320,16 @@
         function togglePowerVoter() { const a=document.getElementById('powervoter-area'); a.style.display = a.style.display==='none'?'block':'none'; }
         function generateStechenList() { const c = document.getElementById('stechen-list'); c.innerHTML = ''; for (const [name, p] of Object.entries(currentPlayers)) { if(!p.isVerified) continue; c.innerHTML += `<label class="p-check-label"><input type="checkbox" value="${name}" class="stechen-check" checked> ${name}</label>`; } }
         function generatePowerVoterList() { const c = document.getElementById('powervoter-list'); c.innerHTML = ''; for (const [name, p] of Object.entries(currentPlayers)) { if(!p.isVerified) continue; c.innerHTML += `<label class="p-check-label"><input type="checkbox" value="${name}" class="powervoter-check"> ${name}</label>`; } }
+        
         function updateModalFields() {
             const type = document.getElementById('m-type').value;
             const container = document.getElementById('dynamic-area');
             const solArea = document.getElementById('solution-area');
             const pvWrapper = document.getElementById('powervoter-wrapper');
-            container.innerHTML = ''; solArea.style.display = 'none'; pvWrapper.style.display = 'none';
+            const ytBox = document.getElementById('yt-config-box');
+            
+            container.innerHTML = ''; solArea.style.display = 'none'; pvWrapper.style.display = 'none'; ytBox.style.display = 'none';
+            
             if (type === 'MC') {
                 container.innerHTML = `<span class="section-label">Antworten:</span><div id="mc-inputs"></div><button class="btn-add-opt" onclick="addMCRow()">+ Option</button>`; addMCRow(); addMCRow(); addMCRow(); addMCRow();
             } else if (type === 'SEQUENCE') {
@@ -326,6 +341,9 @@
                 container.innerHTML = `<span class="section-label">Paare:</span><div id="match-inputs"></div><button class="btn-add-opt" onclick="addMatchPair()">+ Paar</button>`; addMatchPair(); addMatchPair();
             } else if (type === 'PLAYER_VOTE') {
                 pvWrapper.style.display = 'block';
+            } else if (type === 'VIDEO_STREAM') {
+                ytBox.style.display = 'block';
+                container.innerHTML = `<div style="padding:15px; background:#eff6ff; color:#1e40af; border:1px solid #bfdbfe; border-radius:6px; margin-top:10px;">ℹ️ Spieler sehen den Stream. Antwortmöglichkeiten sind deaktiviert.</div>`;
             } else if (type === 'OFFLINE_RESULTS') {
                 container.innerHTML = `<div style="padding:15px; background:#eff6ff; color:#1e40af; border:1px solid #bfdbfe; border-radius:6px; margin-top:10px;">ℹ️ Spieler sehen "Warte auf Ergebnisse". Du kannst die Punkte gleich direkt in der Hauptansicht eintragen.</div>`;
             }
@@ -333,16 +351,21 @@
         function addMCRow() { const div = document.createElement('div'); div.className = 'dynamic-row'; div.innerHTML = `<input type="text" class="dyn-inp mc-text" placeholder="Antwort..."><input type="radio" name="mc_correct" class="radio-correct" title="Ist richtige Antwort" style="width:25px; height:25px; accent-color:#16a34a;">`; document.getElementById('mc-inputs').appendChild(div); }
         function addInputRow(parentId, placeholder) { const div = document.createElement('div'); div.className = 'dynamic-row'; div.innerHTML = `<input type="text" class="dyn-inp" placeholder="${placeholder}">`; document.getElementById(parentId).appendChild(div); }
         function addMatchPair() { const div = document.createElement('div'); div.className = 'dynamic-row'; div.innerHTML = `<input type="text" class="match-l" placeholder="L"><input type="text" class="match-r" placeholder="R">`; document.getElementById('match-inputs').appendChild(div); }
+        
         async function startQuestion() {
             const type = document.getElementById('m-type').value;
             const text = document.getElementById('m-question').value;
             let qText = text;
-            let options = []; let pairs = []; let min = 0; let max = 100; let targetPlayers = []; let correctAnswer = null; let audioData = null; let imageData = null; let powerVoter = [];
+            let options = []; let pairs = []; let min = 0; let max = 100; let targetPlayers = []; let correctAnswer = null; let audioData = null; let imageData = null; let videoData = null; let powerVoter = [];
+            
             const audioUrl = document.getElementById('m-audio-url').value.trim(); const audioFile = document.getElementById('m-audio-file').files[0];
             const imageUrl = document.getElementById('m-image-url').value.trim(); const imageFile = document.getElementById('m-image-file').files[0];
+            
             if (audioUrl) audioData = audioUrl; else if (audioFile) { if (audioFile.size > 500000) { alert("Audio max 500KB"); return; } audioData = await toBase64(audioFile); }
             if (imageUrl) imageData = imageUrl; else if (imageFile) { if (imageFile.size > 1500000) { alert("Bild max 1.5MB"); return; } imageData = await toBase64(imageFile); }
+            
             if (document.getElementById('stechen-area').style.display === 'block') { document.querySelectorAll('.stechen-check').forEach(cb => { if (cb.checked) targetPlayers.push(cb.value); }); if (targetPlayers.length === Object.keys(currentPlayers).filter(k=>currentPlayers[k].isVerified).length) targetPlayers = []; }
+            
             if (type === 'MC') {
                 document.querySelectorAll('#mc-inputs .dynamic-row').forEach(row => { const val = row.querySelector('.mc-text').value.trim(); if(val) { options.push(val); if(row.querySelector('.radio-correct').checked) correctAnswer = val; } });
                 if(options.length < 2) { alert("Min 2 Optionen"); return; } if(!qText) qText = "Wähle aus:";
@@ -360,17 +383,36 @@
                 if (document.getElementById('powervoter-area').style.display === 'block') {
                     document.querySelectorAll('.powervoter-check').forEach(cb => { if (cb.checked) powerVoter.push(cb.value); });
                 }
+            } else if (type === 'VIDEO_STREAM') {
+                const ytLink = document.getElementById('m-yt-link').value.trim();
+                const ytId = extractYoutubeId(ytLink);
+                if (!ytId) { alert("Ungültiger YouTube Link!"); return; }
+                videoData = ytId;
+                if(!qText) qText = "Live Stream";
             } else if (type === 'OFFLINE_RESULTS') {
                 if(!qText) qText = "Offline Ergebnisse";
             }
-            socket.emit('gm_start_round', { type, question: qText, options, pairs, min, max, targetPlayers, correctAnswer, audioData, imageData, powerVoter });
-            closeModal(); document.getElementById('m-question').value = ''; document.getElementById('m-correct-text').value = ''; document.getElementById('m-audio-url').value = ''; document.getElementById('m-audio-file').value = ''; document.getElementById('m-image-url').value = ''; document.getElementById('m-image-file').value = '';
+            
+            socket.emit('gm_start_round', { type, question: qText, options, pairs, min, max, targetPlayers, correctAnswer, audioData, imageData, videoData, powerVoter });
+            closeModal(); 
+            // Reset Fields
+            document.getElementById('m-question').value = ''; document.getElementById('m-correct-text').value = ''; 
+            document.getElementById('m-audio-url').value = ''; document.getElementById('m-audio-file').value = ''; 
+            document.getElementById('m-image-url').value = ''; document.getElementById('m-image-file').value = '';
+            document.getElementById('m-yt-link').value = '';
         }
+
+        function extractYoutubeId(url) {
+            if(!url) return null;
+            const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
+            const match = url.match(regExp);
+            return (match && match[2].length === 11) ? match[2] : null;
+        }
+
         function toBase64(file) { return new Promise((resolve, reject) => { const reader = new FileReader(); reader.readAsDataURL(file); reader.onload = () => resolve(reader.result); reader.onerror = error => reject(error); }); }
         
         // --- BUTTON ACTIONS ---
         function toggleVote() {
-            // Entscheidet basierend auf aktuellem State
             if (isAnsweringOpen) {
                 socket.emit('gm_close_answering');
             } else {
@@ -388,7 +430,6 @@
 
         socket.on('gm_update_full', (data) => {
             currentPlayers = data.players; document.getElementById('game-id-display').innerText = `(${data.gameId})`;
-            // Update Round Times for Timer
             roundStartTime = data.round.startTime;
             roundEndTime = data.round.endTime;
             renderSidebar(data.players); renderMainArea(data.round, data.players);
@@ -402,13 +443,11 @@
             if (roundStartTime) {
                 let diff = 0;
                 if (roundEndTime) {
-                    // Timer gestoppt
                     diff = roundEndTime - roundStartTime;
-                    display.style.color = '#ef4444'; // Rot wenn gestoppt
+                    display.style.color = '#ef4444'; 
                 } else {
-                    // Timer läuft
                     diff = Date.now() - roundStartTime;
-                    display.style.color = '#22c55e'; // Grün wenn läuft
+                    display.style.color = '#22c55e';
                 }
                 
                 if (diff < 0) diff = 0;
@@ -438,34 +477,27 @@
             const btnVote = document.getElementById('btn-toggle-vote'); 
             const btnReveal = document.getElementById('btn-reveal');
             
-            // Speichere globalen Status für Toggle-Funktion
             isAnsweringOpen = round.answeringOpen;
 
             // --- BUTTON LOGIK ---
-            if (round.type === 'WAITING' || round.type === 'OFFLINE_RESULTS') { 
+            if (round.type === 'WAITING' || round.type === 'OFFLINE_RESULTS' || round.type === 'VIDEO_STREAM') { 
                 btnVote.style.display = 'none'; 
                 btnReveal.style.display = 'none'; 
             }
             else if (round.answeringOpen) { 
-                // Status: OFFEN
                 btnVote.style.display = 'inline-flex'; 
                 btnVote.innerHTML = '🔒 Voting Schließen';
-                btnVote.className = 'btn-close-vote'; // Gelb/Warnung
-                
-                btnReveal.style.display = 'none'; // Verstecken solange offen
+                btnVote.className = 'btn-close-vote';
+                btnReveal.style.display = 'none'; 
             }
             else { 
-                // Status: GESCHLOSSEN
                 if (round.revealed) {
-                    // Schon aufgelöst -> Alles weg
                     btnVote.style.display = 'none'; 
                     btnReveal.style.display = 'none';
                 } else {
-                    // Noch nicht aufgelöst -> Wiedereröffnen oder Auflösen
                     btnVote.style.display = 'inline-flex';
                     btnVote.innerHTML = '🔓 Wiedereröffnen';
-                    btnVote.className = 'btn-reopen-vote'; // Grün/Success
-                    
+                    btnVote.className = 'btn-reopen-vote'; 
                     btnReveal.style.display = 'inline-block';
                 }
             }
@@ -474,6 +506,15 @@
             if (round.targetPlayers && round.targetPlayers.length > 0) qInfo += ` <span style="color:#dc2626; font-size:1rem; font-weight:normal;">(Nur: ${round.targetPlayers.join(', ')})</span>`;
             if (round.audioData) { gmAudioWrapper.style.display = 'block'; if (gmAudio.dataset.src !== round.audioData) { gmAudio.src = round.audioData; gmAudio.dataset.src = round.audioData; } } else { gmAudioWrapper.style.display = 'none'; gmAudio.pause(); gmAudio.src = ""; gmAudio.dataset.src = ""; }
             if (round.imageData) { gmImageWrapper.style.display = 'block'; gmImage.src = round.imageData; } else { gmImageWrapper.style.display = 'none'; gmImage.src = ""; }
+            
+            // VIDEO STREAM DISPLAY
+            if (round.videoData) {
+                gmVideoWrapper.style.display = 'block';
+                document.getElementById('gm-video-id').innerText = round.videoData;
+            } else {
+                gmVideoWrapper.style.display = 'none';
+            }
+
             document.getElementById('q-text').innerHTML = qInfo; document.getElementById('q-type').innerText = round.type;
             const grid = document.getElementById('answers-area'); grid.innerHTML = '';
             
