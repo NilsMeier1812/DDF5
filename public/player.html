@@ -62,7 +62,6 @@
         <div id="status-toast">✅ Gesendet!</div>
         <div id="locked-screen"><div style="font-size:3rem;">🔒</div><h3>Voting beendet</h3></div>
         <div id="spectator-screen"><h2 style="color:#aaa;">Nur Zuschauer</h2></div>
-        
         <div id="mode-results" class="mode-container"><div id="correct-answer-display"></div><h3 style="text-align:center; margin-top:0; color:#f39c12;">Antworten:</h3><div class="results-list" id="results-container"></div></div>
         <div id="mode-mc" class="mode-container"><div class="mc-grid" id="mc-container"></div></div>
         <div id="mode-text" class="mode-container"><div class="text-input-wrapper"><textarea id="text-answer" placeholder="Antwort..."></textarea><button class="btn-submit" onclick="sendText()">Absenden</button></div></div>
@@ -78,6 +77,7 @@
         const username = decodeURIComponent(rawName);
         document.getElementById('welcome-name').innerText = username;
         let lastRoundSignature = ''; let currentHistory = []; let localGameId = null; const STORAGE_KEY = `voting_game_auth_${username}`;
+        
         socket.on('connect', () => { socket.emit('player_announce', username); const storedCode = localStorage.getItem(STORAGE_KEY); if (storedCode) setTimeout(() => socket.emit('player_login', { name: username, code: storedCode }), 100); });
         function submitLogin() { const code = document.getElementById('player-code').value; socket.emit('player_login', { name: username, code: code }); }
         socket.on('player_login_success', () => { document.getElementById('login-overlay').style.display = 'none'; const inputCode = document.getElementById('player-code').value; if (inputCode) localStorage.setItem(STORAGE_KEY, inputCode); });
@@ -110,17 +110,13 @@
                 document.getElementById('mode-results').classList.add('active');
                 const solDiv = document.getElementById('correct-answer-display');
                 if (roundData.correctAnswer) {
-                    let txt = roundData.correctAnswer;
-                    if(typeof txt === 'object' && !Array.isArray(txt)) { txt = ""; for(const[k,v] of Object.entries(roundData.correctAnswer)) txt += `${k} → ${v}<br>`; }
-                    else if(Array.isArray(txt)) txt = txt.join(" → ");
+                    let txt = formatAnswer(roundData.correctAnswer);
                     solDiv.innerHTML = `<div class="correct-answer-card"><strong>🏆 LÖSUNG:</strong><br>${txt}</div>`;
                 } else solDiv.innerHTML = '';
                 const cont = document.getElementById('results-container'); cont.innerHTML = '';
                 for(const [name, p] of Object.entries(allPlayers)) {
                     if(p.answer) {
-                        let ans = p.answer; let extras = "";
-                        if(typeof ans === 'object' && !Array.isArray(ans)) { ans = ''; for(const [k,v] of Object.entries(p.answer)) ans += `${k} -> ${v}\n`; }
-                        else if(Array.isArray(ans)) ans = ans.join(', ');
+                        let ans = formatAnswer(p.answer); let extras = "";
                         if(roundData.type === 'ESTIMATE' && roundData.correctAnswer) { const diff = Math.abs(Number(p.answer) - Number(roundData.correctAnswer)); extras = `<span style="color:#e74c3c; font-weight:bold;"> (Diff: ${diff})</span>`; }
                         cont.innerHTML += `<div class="result-card"><div class="res-name">${name}</div><div class="res-val">${ans} ${extras}</div></div>`;
                     }
@@ -136,9 +132,18 @@
             } else if (type === 'PLAYER_VOTE') { document.getElementById('mode-vote').classList.add('active'); renderPlayerCards(allPlayers); }
         }
 
+        // --- HELPER ZUM FORMATIEREN VON ANTWORTEN (Objekt/Array/Text) ---
+        function formatAnswer(val) {
+            if (val === null || val === undefined) return '-';
+            if (Array.isArray(val)) return val.join(' ➝ ');
+            if (typeof val === 'object') {
+                let s = ''; for(const [k,v] of Object.entries(val)) s += `${k} ➝ ${v}\n`; return s;
+            }
+            return val;
+        }
+
         function renderMatchingInterface(pairs, shuffledRight) {
             const container = document.getElementById('matching-container'); container.innerHTML = '';
-            // Use server-provided shuffled right values
             const rightValues = shuffledRight || pairs.map(p => p.right).sort(() => Math.random() - 0.5);
             pairs.forEach(pair => {
                 const row = document.createElement('div'); row.className = 'match-row';
@@ -151,7 +156,7 @@
 
         function renderSequence(items) {
             const container = document.getElementById('sequence-container');
-            let currentItems = [...items]; // Items are already shuffled by server for display
+            let currentItems = [...items]; // Ist schon gemischt vom Server
             const renderList = () => {
                 container.innerHTML = '';
                 currentItems.forEach((item, index) => {
@@ -171,14 +176,18 @@
 
         function renderPlayerCards(players) {
             const container = document.getElementById('vote-player-list'); container.innerHTML = '';
+            let count = 0;
             for (const name in players) {
                 if(name === username || !players[name].isVerified) continue;
+                count++;
+                
                 let historyHTML = '';
-                if (!currentHistory || currentHistory.length === 0) historyHTML = '<div class="history-item" style="color:#666">Keine Fragen bisher.</div>';
-                else {
+                if (!currentHistory || currentHistory.length === 0) {
+                    historyHTML = '<div class="history-item" style="color:#666">Keine Fragen bisher in dieser Runde.</div>';
+                } else {
                     currentHistory.forEach((roundData, index) => {
-                        let ans = roundData.answers[name] || '-';
-                        if(typeof ans === 'object') ans = "(Komplex)";
+                        // WICHTIG: Nutze formatAnswer für komplexe Antworten!
+                        let ans = formatAnswer(roundData.answers[name]);
                         historyHTML += `<div class="history-item"><span style="color:#888;">${index+1}. ${roundData.question}</span><br><span style="color:#3498db;">${ans}</span></div>`;
                     });
                 }
@@ -186,7 +195,11 @@
                 card.innerHTML = `<div class="vote-card-header"><div class="vote-name">${name}</div><button class="btn-inspect" onclick="toggleHistory(this)">👁️</button><button class="btn-vote-action" onclick="sendAnswer('${name}')">VOTE</button></div><div class="vote-history">${historyHTML}</div>`;
                 container.appendChild(card);
             }
+            if(count === 0) {
+                container.innerHTML = `<div style="text-align:center; color:#666; padding:20px;">Warte auf andere Spieler...<br>(Du bist der Einzige hier)</div>`;
+            }
         }
+        
         window.toggleHistory = function(btn) { const h = btn.parentElement.nextElementSibling; if (h.classList.contains('show')) { h.classList.remove('show'); btn.style.background="#444"; } else { h.classList.add('show'); btn.style.background="#555"; } };
         function sendAnswer(val) { socket.emit('submit_answer', { user: username, answer: val }); }
         function sendText() { const val = document.getElementById('text-answer').value; if(val.trim()) sendAnswer(val); }
