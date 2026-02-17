@@ -5,142 +5,263 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GM Control</title>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; margin: 0; padding: 0; background: #f0f2f5; height: 100vh; display: flex; overflow: hidden; }
-        #login-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #2c3e50; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 2000; }
-        .login-box { background: white; padding: 40px; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); text-align: center; }
-        .login-error { color: #e74c3c; font-weight: bold; margin-top: 10px; display: none; }
+        :root {
+            --bg-color: #f3f4f6;
+            --sidebar-bg: #ffffff;
+            --header-bg: #111827;
+            --primary: #2563eb;
+            --warning: #f59e0b;
+            --danger: #dc2626;
+            --success: #16a34a;
+            --purple: #7c3aed;
+            --border: #e5e7eb;
+            --text: #1f2937;
+        }
+
+        body { font-family: 'Segoe UI', system-ui, sans-serif; margin: 0; padding: 0; background: var(--bg-color); color: var(--text); height: 100vh; display: flex; overflow: hidden; }
+        * { box-sizing: border-box; }
+
+        /* --- LOGIN --- */
+        #login-overlay { position: fixed; inset: 0; background: var(--header-bg); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 2000; }
+        .login-box { background: white; padding: 40px; border-radius: 12px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1); text-align: center; width: 350px; }
+        .login-box h2 { margin-top: 0; color: var(--header-bg); }
+        .login-box input { width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 6px; margin-bottom: 20px; font-size: 1.1rem; text-align: center;}
+        .login-error { color: var(--danger); font-weight: bold; margin-top: 15px; display: none; }
+
         #main-ui { display: none; width: 100%; height: 100%; }
-        .sidebar { width: 320px; background: #fff; border-right: 1px solid #ddd; display: flex; flex-direction: column; position: relative; }
-        .sidebar-header { padding: 20px; background: #2c3e50; color: white; font-weight: bold; flex-shrink: 0; }
+
+        /* --- SIDEBAR --- */
+        .sidebar { width: 320px; background: var(--sidebar-bg); border-right: 1px solid var(--border); display: flex; flex-direction: column; position: relative; z-index: 10; box-shadow: 2px 0 10px rgba(0,0,0,0.05); }
+        .sidebar-header { padding: 20px; background: var(--header-bg); color: white; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
         .sidebar-content { flex: 1; overflow-y: auto; }
-        .sidebar-footer { padding: 10px; border-top: 1px solid #eee; text-align: center; background: #f9f9f9; }
-        .player-row { padding: 10px 15px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
-        .player-name { font-weight: bold; font-size: 1rem; }
-        .player-row.eliminated { background: #fbecec; opacity: 0.7; }
-        .player-row.eliminated .player-name { text-decoration: line-through; color: #c0392b; }
-        .player-code { font-size: 0.8rem; color: #7f8c8d; background: #eee; padding: 2px 5px; border-radius: 4px; font-family: monospace;}
-        .lives-control { display: flex; align-items: center; gap: 5px; }
-        .status-dot { width: 10px; height: 10px; border-radius: 50%; background: #ccc; margin-right: 10px; }
-        .status-dot.active { background: #2ecc71; box-shadow: 0 0 5px #2ecc71; }
-        .pending-header { background: #f39c12; color: white; font-size: 0.8rem; font-weight: bold; padding: 8px 15px; text-transform: uppercase; letter-spacing: 1px; margin-top: 20px;}
-        .pending-row { background: #fffbf0; padding: 15px; border-bottom: 1px solid #fcefd0; display: flex; justify-content: space-between; align-items: center; }
-        .pending-code { font-size: 1.4rem; font-family: monospace; font-weight: bold; color: #d35400; letter-spacing: 2px;}
-        .content { flex: 1; padding: 30px; display: flex; flex-direction: column; overflow-y: auto; }
-        .top-bar { display: flex; justify-content: space-between; margin-bottom: 20px; align-items: center; }
-        .btn-new-q { background: #3498db; color: white; padding: 12px 25px; border: none; border-radius: 5px; font-size: 1.1rem; cursor: pointer; font-weight: bold; }
-        .btn-close-vote { background: #e67e22; color: white; padding: 12px 25px; border: none; border-radius: 5px; font-size: 1.1rem; cursor: pointer; font-weight: bold; margin-right: 10px; }
-        .btn-reveal { background: #f1c40f; color: #222; padding: 12px 25px; border: none; border-radius: 5px; font-size: 1.1rem; cursor: pointer; font-weight: bold; margin-right: 10px;}
-        .btn-finish-round { background: #8e44ad; color: white; padding: 12px 25px; border: none; border-radius: 5px; font-size: 1.1rem; cursor: pointer; font-weight: bold; margin-right: 10px; display: flex; align-items: center; gap: 5px; }
-        .current-question { background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; border-left: 5px solid #3498db; display: flex; justify-content: space-between; align-items: flex-start;}
-        .answers-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 15px; }
-        .answer-card { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); border: 1px solid #eee; overflow-wrap: break-word;}
-        #notification-area { position: fixed; bottom: 20px; right: 20px; width: 300px; z-index: 3000; display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
-        .toast { background: #2c3e50; color: white; padding: 15px; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); animation: slideIn 0.3s; pointer-events: all; border-left: 5px solid #f39c12; display: flex; justify-content: space-between; align-items: center;}
-        .toast-code { font-family: monospace; font-size: 1.5rem; background: rgba(255,255,255,0.1); padding: 2px 8px; border-radius: 4px; color: #2ecc71; }
+        .sidebar-footer { padding: 15px; border-top: 1px solid var(--border); background: #f9fafb; }
+        
+        .player-row { padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; transition: background 0.1s; }
+        .player-row:hover { background: #f3f4f6; }
+        .player-info { display: flex; align-items: center; gap: 10px; }
+        .player-name { font-weight: 600; font-size: 0.95rem; }
+        .player-code { font-size: 0.75rem; color: #6b7280; background: #e5e7eb; padding: 2px 6px; border-radius: 4px; font-family: monospace;}
+        
+        .status-dot { width: 10px; height: 10px; border-radius: 50%; background: #d1d5db; box-shadow: inset 0 1px 2px rgba(0,0,0,0.2); }
+        .status-dot.active { background: var(--success); box-shadow: 0 0 8px var(--success); }
+        
+        .player-row.eliminated { background: #fef2f2; opacity: 0.8; }
+        .player-row.eliminated .player-name { text-decoration: line-through; color: var(--danger); }
+        
+        .lives-control { display: flex; align-items: center; gap: 5px; background: white; border: 1px solid var(--border); border-radius: 20px; padding: 2px 8px; }
+        .lives-control button { background: none; border: none; cursor: pointer; color: #6b7280; font-weight: bold; padding: 0 5px; font-size: 1.1rem; }
+        .lives-control button:hover { color: var(--text); }
+
+        .pending-header { background: var(--warning); color: white; font-size: 0.75rem; font-weight: bold; padding: 8px 20px; text-transform: uppercase; letter-spacing: 1px; }
+        .pending-row { background: #fffbeb; padding: 15px 20px; border-bottom: 1px solid #fcd34d; display: flex; justify-content: space-between; align-items: center; }
+
+        /* --- MAIN CONTENT --- */
+        .content { flex: 1; padding: 30px; display: flex; flex-direction: column; overflow-y: auto; background: #f9fafb; }
+        .top-bar { display: flex; justify-content: space-between; margin-bottom: 30px; align-items: center; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .top-bar h1 { margin: 0; font-size: 1.5rem; color: var(--header-bg); }
+        .control-group { display: flex; gap: 10px; }
+
+        /* BUTTONS */
+        button { cursor: pointer; transition: filter 0.2s, transform 0.1s; font-family: inherit; }
+        button:active { transform: scale(0.98); }
+        .btn-new-q { background: var(--primary); color: white; padding: 12px 24px; border: none; border-radius: 8px; font-weight: 600; font-size: 1rem; box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.4); }
+        .btn-close-vote { background: var(--warning); color: white; padding: 12px 24px; border: none; border-radius: 8px; font-weight: 600; }
+        .btn-reveal { background: var(--purple); color: white; padding: 12px 24px; border: none; border-radius: 8px; font-weight: 600; }
+        .btn-finish-round { background: var(--header-bg); color: white; padding: 12px 20px; border: none; border-radius: 8px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+        .btn-danger-all { background: var(--danger); color: white; border: none; padding: 5px 10px; border-radius: 4px; font-size: 0.7rem; font-weight: bold; text-transform: uppercase; }
+        .btn-mini { background: white; border: 1px solid #d1d5db; padding: 8px; border-radius: 6px; width: 100%; font-weight: 600; color: #374151; }
+        .btn-mini:hover { background: #f3f4f6; }
+
+        /* ACTIVE QUESTION CARD */
+        .current-question { background: white; padding: 30px; border-radius: 12px; margin-bottom: 30px; border-left: 6px solid var(--primary); display: flex; justify-content: space-between; align-items: flex-start; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); }
+        .q-meta { color: #6b7280; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px; font-weight: bold; margin-bottom: 10px; }
+        #q-text { font-size: 1.8rem; font-weight: 700; color: #111; line-height: 1.3; }
+        
+        .counter-box { text-align: center; background: #eff6ff; padding: 15px 25px; border-radius: 12px; color: var(--primary); }
+        .counter-num { font-size: 2.5rem; font-weight: 800; display: block; line-height: 1; }
+        .counter-label { font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
+
+        /* ANSWERS GRID */
+        .answers-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
+        .answer-card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); border: 1px solid #f3f4f6; position: relative; overflow: hidden; }
+        .answer-card strong { display: block; color: #6b7280; font-size: 0.85rem; margin-bottom: 8px; text-transform: uppercase; }
+        .answer-val { font-size: 1.2rem; font-weight: 600; color: #111; white-space: pre-wrap; line-height: 1.4; }
+        
+        /* TOASTS */
+        #notification-area { position: fixed; bottom: 20px; right: 20px; width: 320px; z-index: 3000; display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
+        .toast { background: var(--header-bg); color: white; padding: 15px; border-radius: 8px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.2); animation: slideIn 0.3s; pointer-events: all; border-left: 4px solid var(--success); display: flex; justify-content: space-between; align-items: center;}
+        .toast-code { font-family: monospace; font-size: 1.2rem; background: rgba(255,255,255,0.1); padding: 2px 8px; border-radius: 4px; color: var(--success); font-weight: bold; }
         @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-        dialog { border: none; border-radius: 8px; padding: 0; box-shadow: 0 10px 40px rgba(0,0,0,0.3); width: 700px; max-width: 95%; }
-        dialog::backdrop { background: rgba(0,0,0,0.5); }
-        .modal-header { background: #f8f9fa; padding: 15px 20px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
-        .modal-body { padding: 20px; display: flex; flex-direction: column; gap: 15px; max-height: 70vh; overflow-y: auto; }
-        .modal-footer { padding: 15px 20px; border-top: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;}
-        input, select { padding: 10px; width: 100%; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
-        .dynamic-row { display: flex; gap: 10px; margin-bottom: 5px; align-items: center; }
-        .dynamic-row input[type="text"] { flex: 1; }
-        .radio-correct { width: 25px; height: 25px; cursor: pointer; accent-color: #2ecc71; }
-        .correct-answer-section { border-top: 1px solid #eee; padding-top: 15px; margin-top: 10px; }
-        .correct-label { display: block; font-weight: bold; color: #27ae60; margin-bottom: 5px; }
-        .btn-add-opt { background: #eee; border: 1px solid #ccc; padding: 5px 10px; cursor: pointer; width: 100%; border-radius: 4px; margin-top: 5px;}
-        .section-label { font-weight: bold; font-size: 0.9rem; margin-top: 10px; display: block; }
-        .btn-cancel { padding: 10px 15px; cursor: pointer; border: 1px solid #ccc; background: #fff; border-radius: 4px; margin-right: 10px;}
-        .btn-start { background: #2ecc71; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 1rem;}
-        .btn-mini { padding: 2px 8px; cursor: pointer; border: 1px solid #ccc; background: #fff; border-radius: 4px; }
-        #stechen-area, #powervoter-area { border: 1px solid #ddd; padding: 10px; border-radius: 4px; margin-top: 10px; display: none; background: #fafafa; }
-        .player-check-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 5px; margin-top: 5px; }
-        .p-check-label { display: flex; align-items: center; gap: 5px; font-size: 0.9rem; cursor: pointer; background: white; padding: 5px; border: 1px solid #eee; border-radius: 4px; }
-        .p-check-label input { width: auto; margin: 0; }
-        .btn-danger-all { background: #e74c3c; color: white; border: none; padding: 5px 10px; border-radius: 4px; font-size: 0.8rem; cursor: pointer; }
-        .offline-input-row { display: flex; align-items: center; margin-bottom: 5px; }
-        .offline-input-row label { width: 120px; font-weight: bold; }
-        .offline-input-row input { flex: 1; }
+
+        /* MODAL */
+        dialog { border: none; border-radius: 16px; padding: 0; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); width: 700px; max-width: 95%; background: white; }
+        dialog::backdrop { background: rgba(0,0,0,0.5); backdrop-filter: blur(2px); }
+        .modal-header { background: #f9fafb; padding: 20px 30px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+        .modal-header strong { font-size: 1.2rem; }
+        .modal-body { padding: 30px; display: flex; flex-direction: column; gap: 20px; max-height: 70vh; overflow-y: auto; }
+        .modal-footer { padding: 20px 30px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: #f9fafb; }
+        
+        /* Form Elements inside Modal */
+        label { display: block; font-weight: 600; font-size: 0.9rem; margin-bottom: 5px; color: #374151; }
+        input[type="text"], input[type="number"], select { padding: 12px; width: 100%; border: 1px solid #d1d5db; border-radius: 6px; font-size: 1rem; transition: border 0.2s; }
+        input:focus, select:focus { outline: none; border-color: var(--primary); ring: 2px solid var(--primary); }
+        
+        .media-box { background: #f0f9ff; padding: 15px; border-radius: 8px; border: 1px solid #bae6fd; }
+        .dynamic-row { display: flex; gap: 10px; margin-bottom: 10px; align-items: center; }
+        .btn-add-opt { background: #e5e7eb; border: none; padding: 8px 15px; cursor: pointer; width: 100%; border-radius: 6px; font-weight: 600; color: #4b5563; }
+        .btn-add-opt:hover { background: #d1d5db; }
+        
+        .correct-answer-section { border-top: 2px dashed #e5e7eb; padding-top: 20px; margin-top: 10px; }
+        .correct-label { color: var(--success); }
+        
+        .btn-cancel { padding: 10px 20px; cursor: pointer; border: 1px solid #d1d5db; background: white; border-radius: 6px; font-weight: 600; color: #374151;}
+        .btn-start { background: var(--success); color: white; border: none; padding: 10px 25px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 1rem; box-shadow: 0 4px 6px -1px rgba(22, 163, 74, 0.4);}
+        .btn-reset-round { background: #fee2e2; color: var(--danger); border: 1px solid #fecaca; padding: 8px 15px; border-radius: 6px; font-weight: bold; cursor: pointer; }
+
+        /* Stechen Grid */
+        .player-check-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; margin-top: 10px; }
+        .p-check-label { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; cursor: pointer; background: white; padding: 8px; border: 1px solid #e5e7eb; border-radius: 6px; user-select: none; }
+        .p-check-label:hover { background: #f9fafb; }
+        
+        /* Offline Inputs */
+        .offline-input-row { display: flex; align-items: center; margin-bottom: 10px; background: white; padding: 10px; border-radius: 6px; border: 1px solid #e5e7eb; }
+        .offline-input-row label { width: 150px; font-weight: bold; }
     </style>
 </head>
 <body>
-    <div id="login-overlay"><div class="login-box"><h2>🔒 GM Login</h2><input type="password" id="gm-password" placeholder="Passwort" onkeyup="if(event.key === 'Enter') login()"><br><br><button class="btn-new-q" onclick="login()">Einloggen</button><p id="login-msg" class="login-error">Falsches Passwort!</p></div></div>
+    <div id="login-overlay">
+        <div class="login-box">
+            <h2>🔒 GM Access</h2>
+            <input type="password" id="gm-password" placeholder="Passwort eingeben" onkeyup="if(event.key === 'Enter') login()">
+            <button class="btn-new-q" onclick="login()" style="width:100%;">Login</button>
+            <p id="login-msg" class="login-error">Passwort falsch!</p>
+        </div>
+    </div>
+    
     <div id="notification-area"></div>
+    
     <div id="main-ui">
         <div class="sidebar">
-            <div class="sidebar-header" style="display:flex; justify-content:space-between; align-items:center;">Teilnehmer<button class="btn-danger-all" onclick="resetAll()">🔥 RESET</button></div>
+            <div class="sidebar-header">
+                <span>SPIELER</span>
+                <button class="btn-danger-all" onclick="resetAll()">Reset All</button>
+            </div>
             <div id="sidebar-list" class="sidebar-content"></div>
-            <div class="sidebar-footer"><button class="btn-mini" onclick="manualAddPlayer()" style="width:100%; padding:8px;">+ Manueller Spieler (Code)</button></div>
+            <div class="sidebar-footer">
+                <button class="btn-mini" onclick="manualAddPlayer()">+ Manueller Spieler (Code)</button>
+            </div>
         </div>
+
         <div class="content">
             <div class="top-bar">
-                <h1>Gamemaster <span id="game-id-display" style="font-size:0.8rem; color:#aaa; font-weight:normal;"></span></h1>
-                <div style="display:flex; align-items:center;">
+                <div>
+                    <h1>Control Center <span id="game-id-display" style="font-size:1rem; color:#9ca3af; font-weight:normal;"></span></h1>
+                </div>
+                <div class="control-group">
                     <button id="btn-close-vote" class="btn-close-vote" onclick="closeVote()">🔒 Voting Schließen</button>
                     <button id="btn-reveal" class="btn-reveal" onclick="reveal()">👁️ Auflösen</button>
-                    <button class="btn-finish-round" onclick="finishRoundPhase()">🏁 Runde beenden</button>
+                    <div style="width: 1px; background: #e5e7eb; margin: 0 10px;"></div>
+                    <button class="btn-finish-round" onclick="finishRoundPhase()">
+                        🏁 Runde beenden
+                    </button>
                     <button class="btn-new-q" onclick="openModal()">+ Nächste Frage</button>
                 </div>
             </div>
+
             <div class="current-question">
                 <div style="flex:1;">
-                    <h2 id="q-text" style="margin:0;">...</h2>
-                    <p id="q-type" style="margin:5px 0 0 0; color:#777;">...</p>
-                    <div id="gm-image-wrapper" style="margin-top:15px; display:none;"><img id="gm-image-display" src="" style="max-height:200px; max-width:100%; border-radius:5px; border:1px solid #ccc;"></div>
-                    <div id="gm-audio-wrapper" style="margin-top:10px; display:none;"><audio id="gm-audio-player" controls style="width:100%;"></audio></div>
+                    <div id="q-type" class="q-meta">WAITING</div>
+                    <div id="q-text">Warte auf Start...</div>
+                    <div id="gm-image-wrapper" style="margin-top:20px; display:none;"><img id="gm-image-display" src="" style="max-height:250px; border-radius:8px; border:1px solid #e5e7eb;"></div>
+                    <div id="gm-audio-wrapper" style="margin-top:15px; display:none; background:#f3f4f6; padding:10px; border-radius:8px;"><audio id="gm-audio-player" controls style="width:100%;"></audio></div>
                 </div>
-                <div style="text-align:right; margin-left:20px;">
-                    <strong style="font-size:2rem; color:#3498db;" id="answer-count">0</strong>
-                    <div style="font-size:0.8rem;">Antworten</div>
+                <div class="counter-box">
+                    <span class="counter-num" id="answer-count">0</span>
+                    <span class="counter-label">Antworten</span>
                 </div>
             </div>
+
             <div class="answers-grid" id="answers-area"></div>
-            <div id="offline-input-area" style="display:none; background:white; padding:20px; border-radius:10px; margin-top:20px;">
-                <h3>📝 Offline Ergebnisse eintragen</h3>
+            
+            <div id="offline-input-area" style="display:none; background: #fff7ed; padding:25px; border-radius:12px; margin-top:30px; border:1px solid #ffedd5;">
+                <h3 style="color:#9a3412; margin-top:0;">📝 Offline Ergebnisse eintragen</h3>
                 <div id="offline-player-inputs"></div>
-                <button class="btn-new-q" onclick="saveOfflineResults()">Ergebnisse Speichern</button>
+                <button class="btn-new-q" onclick="saveOfflineResults()" style="background:#ea580c; margin-top:15px;">Ergebnisse Speichern</button>
             </div>
         </div>
     </div>
+
     <dialog id="q-modal">
-        <div class="modal-header"><strong>Frage konfigurieren</strong><button onclick="closeModal()" style="background:none; border:none; cursor:pointer; font-size:1.5rem;">&times;</button></div>
+        <div class="modal-header">
+            <strong>Neue Frage konfigurieren</strong>
+            <button onclick="closeModal()" style="background:none; border:none; cursor:pointer; font-size:1.5rem; color:#6b7280;">&times;</button>
+        </div>
         <div class="modal-body">
-            <label><strong>Modus:</strong></label>
-            <select id="m-type" onchange="updateModalFields()">
-                <option value="MC">Multiple Choice</option>
-                <option value="SEQUENCE">Reihenfolge (Sortieren)</option>
-                <option value="ESTIMATE">Schätzen (Zahl)</option>
-                <option value="MATCHING">Zuordnen (Paare)</option>
-                <option value="TEXT">Textantwort</option>
-                <option value="PLAYER_VOTE">Voting: Wer verliert Leben?</option>
-                <option value="OFFLINE_RESULTS">Ergebnisse extern</option>
-            </select>
-            <label><strong>Frage / Titel:</strong></label><input type="text" id="m-question" placeholder="Fragetext eingeben...">
-            <div style="background:#f0f8ff; padding:10px; border-radius:5px; border:1px solid #add8e6;">
-                <label><strong>🎧 Audio (Optional):</strong></label><input type="text" id="m-audio-url" placeholder="URL (z.B. mp3 Link)">
-                <div style="margin-top:5px; display:flex; align-items:center; gap:5px;"><span style="font-size:0.8rem;">Oder Datei (Max 500KB):</span><input type="file" id="m-audio-file" accept="audio/*" style="font-size:0.8rem;"></div>
-                <hr style="border:0; border-top:1px solid #d0e8f5; margin:10px 0;">
-                <label><strong>🖼️ Bild (Optional):</strong></label><input type="text" id="m-image-url" placeholder="URL (z.B. Bild Link)">
-                <div style="margin-top:5px; display:flex; align-items:center; gap:5px;"><span style="font-size:0.8rem;">Oder Datei (Max 1.5MB):</span><input type="file" id="m-image-file" accept="image/*" style="font-size:0.8rem;"></div>
+            <div>
+                <label>Modus</label>
+                <select id="m-type" onchange="updateModalFields()">
+                    <option value="MC">Multiple Choice</option>
+                    <option value="SEQUENCE">Reihenfolge (Sortieren)</option>
+                    <option value="ESTIMATE">Schätzen (Zahl)</option>
+                    <option value="MATCHING">Zuordnen (Paare)</option>
+                    <option value="TEXT">Freitext</option>
+                    <option value="PLAYER_VOTE">Voting (Leben abziehen)</option>
+                    <option value="OFFLINE_RESULTS">Ergebnisse extern</option>
+                </select>
             </div>
-            <div style="margin-top:10px;">
-                <button class="btn-mini" onclick="toggleStechen()">⚔️ Stechen / Zielgruppe</button>
-                <div id="stechen-area"><small>Wer soll die Frage bekommen? (Leer = Alle)</small><div class="player-check-grid" id="stechen-list"></div></div>
+            
+            <div>
+                <label>Fragetext / Titel</label>
+                <input type="text" id="m-question" placeholder="Was ist die Hauptstadt von...">
             </div>
-            <!-- MULTI POWER VOTER -->
-            <div id="powervoter-wrapper" style="margin-top:10px; display:none;">
-                <button class="btn-mini" onclick="togglePowerVoter()">Doppelte Stimme</button>
-                <div id="powervoter-area">
-                    <small>Wer hat doppelte Stimmkraft?</small>
+
+            <div class="media-box">
+                <label>🎧 Audio (Optional)</label>
+                <div style="display:flex; gap:10px;">
+                    <input type="text" id="m-audio-url" placeholder="URL (z.B. .mp3)" style="flex:1;">
+                    <input type="file" id="m-audio-file" accept="audio/*" style="font-size:0.8rem; width:200px;">
+                </div>
+                <hr style="border:0; border-top:1px solid #bae6fd; margin:15px 0;">
+                <label>🖼️ Bild (Optional)</label>
+                <div style="display:flex; gap:10px;">
+                    <input type="text" id="m-image-url" placeholder="URL (z.B. .jpg)" style="flex:1;">
+                    <input type="file" id="m-image-file" accept="image/*" style="font-size:0.8rem; width:200px;">
+                </div>
+            </div>
+
+            <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                <button class="btn-mini" style="width:auto;" onclick="toggleStechen()">⚔️ Zielgruppe einschränken (Stechen)</button>
+                <button class="btn-mini" style="width:auto;" onclick="togglePowerVoter()">⚡ Power-Voter (Doppelte Stimme)</button>
+            </div>
+
+            <div id="stechen-area" style="display:none; background:#f9fafb; padding:15px; border-radius:8px; border:1px solid #e5e7eb;">
+                <small style="font-weight:bold; color:#6b7280;">Wer soll die Frage bekommen? (Leer = Alle)</small>
+                <div class="player-check-grid" id="stechen-list"></div>
+            </div>
+
+            <div id="powervoter-wrapper" style="display:none;">
+                <div id="powervoter-area" style="background:#f9fafb; padding:15px; border-radius:8px; border:1px solid #e5e7eb; margin-top:10px;">
+                    <small style="font-weight:bold; color:#6b7280;">Wer hat doppelte Stimmkraft?</small>
                     <div class="player-check-grid" id="powervoter-list"></div>
                 </div>
             </div>
+
             <div id="dynamic-area"></div>
-            <div id="solution-area" class="correct-answer-section" style="display:none;"><label class="correct-label">💡 Musterlösung (wird beim Auflösen angezeigt):</label><input type="text" id="m-correct-text" placeholder="Richtige Antwort eingeben..."></div>
+            
+            <div id="solution-area" class="correct-answer-section" style="display:none;">
+                <label class="correct-label">💡 Musterlösung (Für Anzeige):</label>
+                <input type="text" id="m-correct-text" placeholder="Richtige Antwort eingeben...">
+            </div>
         </div>
-        <div class="modal-footer"><button class="btn-reset-round" onclick="startRound(true)">⚠️ Neue Spielrunde</button><div style="display:flex; gap:10px;"><button class="btn-cancel" onclick="closeModal()">Abbrechen</button><button class="btn-start" onclick="startQuestion()">Frage Starten</button></div></div>
+        <div class="modal-footer">
+            <button class="btn-reset-round" onclick="startRound(true)">⚠️ Reset Game State</button>
+            <div style="display:flex; gap:10px;">
+                <button class="btn-cancel" onclick="closeModal()">Abbrechen</button>
+                <button class="btn-start" onclick="startQuestion()">Frage Starten</button>
+            </div>
+        </div>
     </dialog>
+
     <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io();
@@ -148,7 +269,7 @@
         function login() { const pw = document.getElementById('gm-password').value; socket.emit('gm_login', pw); }
         socket.on('gm_login_success', () => { document.getElementById('login-overlay').style.display = 'none'; document.getElementById('main-ui').style.display = 'flex'; });
         socket.on('gm_login_fail', () => { document.getElementById('login-msg').style.display = 'block'; });
-        socket.on('gm_player_joined', (data) => { const container = document.getElementById('notification-area'); const toast = document.createElement('div'); toast.className = 'toast'; toast.innerHTML = `<div><strong>${data.name}</strong><small>${data.isManual?'Manuell':'Beitritt'}</small></div><div class="toast-code">${data.code}</div>`; container.appendChild(toast); setTimeout(() => toast.remove(), 10000); });
+        socket.on('gm_player_joined', (data) => { const container = document.getElementById('notification-area'); const toast = document.createElement('div'); toast.className = 'toast'; toast.innerHTML = `<div><strong>${data.name}</strong><small style="display:block; opacity:0.8;">${data.isManual?'Manuell':'Beitritt'}</small></div><div class="toast-code">${data.code}</div>`; container.appendChild(toast); setTimeout(() => toast.remove(), 10000); });
         function manualAddPlayer() { const name = prompt("Name:"); if(name) socket.emit('gm_create_player', name); }
         function finishRoundPhase() { if(confirm("🏁 Runde wirklich beenden?\n\n- Archiviert alle Fragen der aktuellen Phase\n- Leert die History\n- Startet 'Runde X+1'")) socket.emit('gm_next_round_phase'); }
         const gmAudio = document.getElementById('gm-audio-player');
@@ -183,10 +304,10 @@
             } else if (type === 'PLAYER_VOTE') {
                 pvWrapper.style.display = 'block';
             } else if (type === 'OFFLINE_RESULTS') {
-                container.innerHTML = `<div style="padding:10px; background:#e8f6f3; color:#0e6251; border:1px solid #d1f2eb; border-radius:5px;">ℹ️ Spieler sehen "Warte auf Ergebnisse". Du kannst die Punkte gleich direkt in der Hauptansicht eintragen.</div>`;
+                container.innerHTML = `<div style="padding:15px; background:#eff6ff; color:#1e40af; border:1px solid #bfdbfe; border-radius:6px; margin-top:10px;">ℹ️ Spieler sehen "Warte auf Ergebnisse". Du kannst die Punkte gleich direkt in der Hauptansicht eintragen.</div>`;
             }
         }
-        function addMCRow() { const div = document.createElement('div'); div.className = 'dynamic-row'; div.innerHTML = `<input type="text" class="dyn-inp mc-text" placeholder="Antwort..."><input type="radio" name="mc_correct" class="radio-correct" title="Ist richtige Antwort">`; document.getElementById('mc-inputs').appendChild(div); }
+        function addMCRow() { const div = document.createElement('div'); div.className = 'dynamic-row'; div.innerHTML = `<input type="text" class="dyn-inp mc-text" placeholder="Antwort..."><input type="radio" name="mc_correct" class="radio-correct" title="Ist richtige Antwort" style="width:25px; height:25px; accent-color:#16a34a;">`; document.getElementById('mc-inputs').appendChild(div); }
         function addInputRow(parentId, placeholder) { const div = document.createElement('div'); div.className = 'dynamic-row'; div.innerHTML = `<input type="text" class="dyn-inp" placeholder="${placeholder}">`; document.getElementById(parentId).appendChild(div); }
         function addMatchPair() { const div = document.createElement('div'); div.className = 'dynamic-row'; div.innerHTML = `<input type="text" class="match-l" placeholder="L"><input type="text" class="match-r" placeholder="R">`; document.getElementById('match-inputs').appendChild(div); }
         async function startQuestion() {
@@ -243,10 +364,11 @@
                 const row = document.createElement('div'); row.className = 'player-row'; let nameHtml = `<div class="player-name">${p.name}</div>`;
                 if(p.lives <= 0) { row.classList.add('eliminated'); nameHtml = `<div class="player-name">💀 ${p.name}</div>`; }
                 const dotClass = p.hasAnswered ? 'status-dot active' : 'status-dot';
-                row.innerHTML = `<div style="display:flex; align-items:center;"><span class="${dotClass}"></span><div>${nameHtml}<span class="player-code">${p.code}</span></div></div><div class="lives-control"><button class="btn-mini" onclick="modLife('${p.name}', -1)">-</button><span style="min-width:30px; text-align:center;">${p.lives}❤️</span><button class="btn-mini" onclick="modLife('${p.name}', 1)">+</button></div>`;
+                const connectedStyle = p.connected ? '' : 'opacity:0.4;';
+                row.innerHTML = `<div class="player-info" style="${connectedStyle}"><span class="${dotClass}"></span><div>${nameHtml}<span class="player-code">${p.code}</span></div></div><div class="lives-control"><button onclick="modLife('${p.name}', -1)">−</button><span style="min-width:20px; text-align:center; font-size:0.9rem;">${p.lives}</span><button onclick="modLife('${p.name}', 1)">+</button></div>`;
                 list.appendChild(row);
             });
-            if (pending.length > 0) { list.innerHTML += `<div class="pending-header">Beitrittsanfragen</div>`; pending.forEach(p => list.innerHTML += `<div class="pending-row"><div><strong>${p.name}</strong></div><div class="pending-code">${p.code}</div></div>`); }
+            if (pending.length > 0) { list.innerHTML += `<div class="pending-header">Beitrittsanfragen</div>`; pending.forEach(p => list.innerHTML += `<div class="pending-row"><div><strong>${p.name}</strong></div><div style="font-family:monospace; font-weight:bold;">${p.code}</div></div>`); }
         }
         function renderMainArea(round, players) {
             const btnClose = document.getElementById('btn-close-vote'); const btnReveal = document.getElementById('btn-reveal');
@@ -254,13 +376,12 @@
             else if (round.answeringOpen) { btnClose.style.display = 'inline-block'; btnReveal.style.display = 'none'; }
             else { btnClose.style.display = 'none'; btnReveal.style.display = 'inline-block'; }
             let qInfo = round.question || "Warte auf Start...";
-            if (round.targetPlayers && round.targetPlayers.length > 0) qInfo += ` <span style="color:#e74c3c; font-size:0.8rem;">(Nur: ${round.targetPlayers.join(', ')})</span>`;
+            if (round.targetPlayers && round.targetPlayers.length > 0) qInfo += ` <span style="color:#dc2626; font-size:1rem; font-weight:normal;">(Nur: ${round.targetPlayers.join(', ')})</span>`;
             if (round.audioData) { gmAudioWrapper.style.display = 'block'; if (gmAudio.dataset.src !== round.audioData) { gmAudio.src = round.audioData; gmAudio.dataset.src = round.audioData; } } else { gmAudioWrapper.style.display = 'none'; gmAudio.pause(); gmAudio.src = ""; gmAudio.dataset.src = ""; }
             if (round.imageData) { gmImageWrapper.style.display = 'block'; gmImage.src = round.imageData; } else { gmImageWrapper.style.display = 'none'; gmImage.src = ""; }
             document.getElementById('q-text').innerHTML = qInfo; document.getElementById('q-type').innerText = round.type;
             const grid = document.getElementById('answers-area'); grid.innerHTML = '';
             
-            // OFFLINE RESULTS INPUT
             const offlineArea = document.getElementById('offline-input-area');
             if (round.type === 'OFFLINE_RESULTS' && !round.revealed) {
                 offlineArea.style.display = 'block';
@@ -278,10 +399,9 @@
                 if (typeof round.correctAnswer === 'string' || typeof round.correctAnswer === 'number') solText = round.correctAnswer;
                 else if (Array.isArray(round.correctAnswer)) solText = round.correctAnswer.join(" → ");
                 else if (typeof round.correctAnswer === 'object') { solText = ""; for(const[k,v] of Object.entries(round.correctAnswer)) solText += `${k}=${v}, `; }
-                grid.innerHTML += `<div style="grid-column: 1/-1; background:#d4edda; color:#155724; padding:15px; border-radius:8px; border:1px solid #c3e6cb; margin-bottom:10px;"><strong>🏆 RICHTIGE ANTWORT:</strong> <span style="font-size:1.2rem; font-weight:bold;">${solText}</span></div>`;
+                grid.innerHTML += `<div style="grid-column: 1/-1; background:#dcfce7; color:#14532d; padding:20px; border-radius:12px; border:1px solid #bbf7d0; margin-bottom:15px; display:flex; align-items:center; gap:10px;"><strong>🏆 RICHTIGE ANTWORT:</strong> <span style="font-size:1.3rem; font-weight:bold;">${solText}</span></div>`;
             }
             
-            // VOTING AUSWERTUNG
             if (round.type === 'PLAYER_VOTE') {
                 const votes = {};
                 let maxVotes = 0;
@@ -290,7 +410,7 @@
                         const target = p.answer;
                         if (!votes[target]) votes[target] = 0;
                         let weight = 1;
-                        if (round.powerVoter && Array.isArray(round.powerVoter) && round.powerVoter.includes(voterName)) weight = 2; // DOPPELT ZÄHLEN
+                        if (round.powerVoter && Array.isArray(round.powerVoter) && round.powerVoter.includes(voterName)) weight = 2;
                         votes[target] += weight;
                         if (votes[target] > maxVotes) maxVotes = votes[target];
                     }
@@ -298,12 +418,12 @@
                 
                 if (round.revealed) {
                     const sorted = Object.entries(votes).sort((a,b) => b[1] - a[1]);
-                    let summaryHtml = `<div style="grid-column: 1/-1; margin-bottom:15px;"><h3>📊 Auswertung:</h3>`;
+                    let summaryHtml = `<div style="grid-column: 1/-1; margin-bottom:15px; background:white; padding:20px; border-radius:12px; border:1px solid #e5e7eb;"><h3>📊 Auswertung:</h3>`;
                     sorted.forEach(([name, count]) => {
                         const isLeader = count === maxVotes;
-                        const style = isLeader ? "background:#e74c3c; color:white; font-weight:bold; border:2px solid #c0392b;" : "background:#eee;";
+                        const style = isLeader ? "background:#fee2e2; color:#b91c1c; font-weight:bold; border:1px solid #fecaca;" : "background:#f3f4f6; color:#4b5563;";
                         const icon = isLeader ? "💀 " : "";
-                        summaryHtml += `<div style="padding:10px; margin-bottom:5px; border-radius:5px; display:flex; justify-content:space-between; ${style}"><span>${icon}${name}</span><span>${count} Stimmen</span></div>`;
+                        summaryHtml += `<div style="padding:12px; margin-bottom:5px; border-radius:6px; display:flex; justify-content:space-between; ${style}"><span>${icon}${name}</span><span>${count} Stimmen</span></div>`;
                     });
                     summaryHtml += `</div>`;
                     grid.innerHTML += summaryHtml;
@@ -319,8 +439,8 @@
                     if (round.type === 'MATCHING' && typeof p.answer === 'object') {
                         displayAnswer = '<ul style="margin:0; padding-left:20px;">'; for(const [k, v] of Object.entries(p.answer)) displayAnswer += `<li>${k} ➝ <b>${v}</b></li>`; displayAnswer += '</ul>';
                     } else if (Array.isArray(p.answer)) displayAnswer = p.answer.join(" → ");
-                    if (round.type === 'PLAYER_VOTE') { card.style.borderLeft = "5px solid #e74c3c"; card.innerHTML = `<strong>${name} wählt:</strong><div style="font-size:1.5rem">${p.answer}</div>`; }
-                    else card.innerHTML = `<strong>${name}</strong><div style="font-size:1.1rem; color:#3498db;">${displayAnswer}</div>`;
+                    if (round.type === 'PLAYER_VOTE') { card.style.borderLeft = "6px solid #ef4444"; card.innerHTML = `<strong>${name} wählt:</strong><div style="font-size:1.5rem; font-weight:bold;">${p.answer}</div>`; }
+                    else card.innerHTML = `<strong>${name}</strong><div class="answer-val" style="color:#2563eb;">${displayAnswer}</div>`;
                     grid.appendChild(card);
                 }
             }
