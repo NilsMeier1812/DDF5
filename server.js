@@ -370,7 +370,7 @@ io.on('connection', (socket) => {
             powerVoter: data.powerVoter || [],
             revealedAnswers: [], 
             revealed: false,
-            answeringOpen: shouldOpen, // Angepasst
+            answeringOpen: shouldOpen, 
             startTime: Date.now(), 
             endTime: null
         };
