@@ -80,7 +80,8 @@
         /* ACTIVE QUESTION CARD */
         .current-question { background: white; padding: 30px; border-radius: 12px; margin-bottom: 30px; border-left: 6px solid var(--primary); display: flex; justify-content: space-between; align-items: flex-start; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); }
         .q-meta { color: #6b7280; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px; font-weight: bold; margin-bottom: 10px; }
-        #q-text { font-size: 1.8rem; font-weight: 700; color: #111; line-height: 1.3; }
+        #q-text { font-size: 1.8rem; font-weight: 700; color: #111; line-height: 1.3; margin:0;}
+        .q-text-hidden { opacity: 0.3; filter: blur(4px); }
         
         .stats-col { display: flex; flex-direction: column; gap: 10px; min-width: 140px; }
         .counter-box { text-align: center; background: #eff6ff; padding: 15px; border-radius: 12px; color: var(--primary); }
@@ -91,11 +92,20 @@
 
         /* ANSWERS GRID */
         .answers-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
-        .answer-card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); border: 1px solid #f3f4f6; position: relative; overflow: hidden; }
+        .answer-card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); border: 1px solid #f3f4f6; position: relative; overflow: hidden; display: flex; flex-direction: column; }
         .answer-card strong { display: block; color: #6b7280; font-size: 0.85rem; margin-bottom: 8px; text-transform: uppercase; }
-        .answer-val { font-size: 1.2rem; font-weight: 600; color: #111; white-space: pre-wrap; line-height: 1.4; }
+        .answer-val { font-size: 1.2rem; font-weight: 600; color: #111; white-space: pre-wrap; line-height: 1.4; flex: 1;}
         .diff-badge { background: #fee2e2; color: #b91c1c; font-size: 0.8rem; padding: 2px 6px; border-radius: 4px; font-weight: bold; margin-left: 8px; border: 1px solid #fecaca; }
         
+        .answer-revealed { border: 2px solid #22c55e; background: #f0fdf4; order: -1; } /* Grüne Umrandung & nach oben */
+
+        .btn-reveal-single { 
+            position: absolute; top: 10px; right: 10px; 
+            background: #e5e7eb; border: none; border-radius: 50%; width: 30px; height: 30px; 
+            cursor: pointer; display: flex; align-items: center; justify-content: center;
+        }
+        .btn-reveal-single:hover { background: #d1d5db; }
+
         /* TOASTS */
         #notification-area { position: fixed; bottom: 20px; right: 20px; width: 320px; z-index: 3000; display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
         .toast { background: var(--header-bg); color: white; padding: 15px; border-radius: 8px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.2); animation: slideIn 0.3s; pointer-events: all; border-left: 4px solid var(--success); display: flex; justify-content: space-between; align-items: center;}
@@ -136,9 +146,10 @@
         .offline-input-row { display: flex; align-items: center; margin-bottom: 10px; background: white; padding: 10px; border-radius: 6px; border: 1px solid #e5e7eb; }
         .offline-input-row label { width: 150px; font-weight: bold; }
 
-        .gm-img-controls { margin-top: 10px; }
-        .btn-img-toggle { background: #4b5563; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 0.9rem; display: flex; align-items: center; gap: 6px; }
-        .btn-img-toggle.visible { background: #16a34a; }
+        .gm-img-controls { margin-top: 10px; display: flex; gap: 10px; }
+        .btn-toggle { background: #4b5563; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 0.9rem; display: flex; align-items: center; gap: 6px; }
+        .btn-toggle.visible { background: #16a34a; }
+        .btn-toggle.hidden { background: #dc2626; }
     </style>
 </head>
 <body>
@@ -176,24 +187,31 @@
                     <span id="round-counter-display" style="color:var(--primary); font-weight:bold; font-size:0.9rem; margin-top:2px;">Runde 1</span>
                 </div>
                 <div class="control-group">
-                    <button id="btn-toggle-vote" class="btn-close-vote" onclick="toggleVote()">🔒 Voting Schließen</button>
                     <button id="btn-reveal" class="btn-reveal" onclick="reveal()">👁️ Auflösen</button>
+                    <button id="btn-toggle-vote" class="btn-close-vote" onclick="toggleVote()">🔒 Voting Schließen</button>
                     <div style="width: 1px; background: #e5e7eb; margin: 0 10px;"></div>
                     <button class="btn-finish-round" onclick="finishRoundPhase()">
                         🏁 Runde beenden
                     </button>
-                    <button class="btn-new-q" onclick="openModal()">+ Nächste Frage</button>
+                    <!-- NEUER NAME -->
+                    <button class="btn-new-q" onclick="openModal()">+ Erstellen</button>
                 </div>
             </div>
 
             <div class="current-question">
                 <div style="flex:1;">
                     <div id="q-type" class="q-meta">WAITING</div>
-                    <div id="q-text">Warte auf Start...</div>
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <h2 id="q-text">Warte auf Start...</h2>
+                        <button id="btn-text-toggle" class="btn-toggle visible" onclick="toggleText()" style="padding:4px 8px; font-size:0.8rem; height:fit-content; display:none;">
+                            <span>T</span>
+                        </button>
+                    </div>
+                    
                     <div id="gm-image-wrapper" style="margin-top:20px; display:none;">
                         <img id="gm-image-display" src="" style="max-height:250px; border-radius:8px; border:1px solid #e5e7eb;">
                         <div class="gm-img-controls">
-                            <button id="btn-img-toggle" class="btn-img-toggle" onclick="toggleImage()">
+                            <button id="btn-img-toggle" class="btn-toggle" onclick="toggleImage()">
                                 <span>👁️</span> <span id="img-toggle-text">Bild zeigen</span>
                             </button>
                         </div>
@@ -230,15 +248,21 @@
             <div>
                 <label>Modus</label>
                 <select id="m-type" onchange="updateModalFields()">
-                    <option value="MC">Multiple Choice</option>
-                    <option value="LIST">Aufzählen (Liste)</option> <!-- NEU -->
-                    <option value="SEQUENCE">Reihenfolge (Sortieren)</option>
-                    <option value="ESTIMATE">Schätzen (Zahl)</option>
-                    <option value="MATCHING">Zuordnen (Paare)</option>
-                    <option value="TEXT">Freitext</option>
-                    <option value="PLAYER_VOTE">Voting (Leben abziehen)</option>
-                    <option value="VIDEO_STREAM">🔴 YouTube Stream (Live)</option>
-                    <option value="OFFLINE_RESULTS">Ergebnisse extern</option>
+                    <!-- NEUE GRUPPIERUNG & SORTIERUNG -->
+                    <optgroup label="Interaktiv / Fragen">
+                        <option value="MC">Multiple Choice</option>
+                        <option value="ESTIMATE">Schätzen (Zahl)</option>
+                        <option value="TEXT">Freitext</option>
+                        <option value="LIST">Aufzählen (Liste)</option>
+                        <option value="SEQUENCE">Reihenfolge (Sortieren)</option>
+                        <option value="MATCHING">Zuordnen (Paare)</option>
+                        <option value="PLAYER_VOTE">Voting (Leben abziehen)</option>
+                    </optgroup>
+                    <optgroup label="Content / Passive">
+                        <option value="INFO">Info / Text anzeigen</option> <!-- NEU -->
+                        <option value="VIDEO_STREAM">Video Stream (YouTube)</option>
+                        <option value="OFFLINE_RESULTS">Offline Ergebnisse</option>
+                    </optgroup>
                 </select>
             </div>
             
@@ -266,7 +290,7 @@
                     <input type="text" id="m-image-url" placeholder="URL (z.B. .jpg)" style="flex:1;">
                     <input type="file" id="m-image-file" accept="image/*" style="font-size:0.8rem; width:200px;">
                 </div>
-                <div style="margin-top:5px; font-size:0.8rem; color:#6b7280;">Bild wird standardmäßig verborgen gestartet.</div>
+                <div style="margin-top:5px; font-size:0.8rem; color:#6b7280;">Bild max 2MB. Standardmäßig verborgen.</div>
             </div>
 
             <div style="display:flex; gap:10px; flex-wrap:wrap;">
@@ -302,13 +326,14 @@
         </div>
     </dialog>
 
-    <!-- LOGIC SCRIPT (UNCHANGED) -->
+    <!-- LOGIC SCRIPT -->
     <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io();
         let currentPlayers = {}; 
         let isAnsweringOpen = false;
-        let isImageRevealed = false; // Lokaler State für Image Toggle
+        let isImageRevealed = false; 
+        let isTextRevealed = true; 
         
         // Timer Globals
         let timerInterval = null;
@@ -338,11 +363,9 @@
         function generateStechenList() { const c = document.getElementById('stechen-list'); c.innerHTML = ''; for (const [name, p] of Object.entries(currentPlayers)) { if(!p.isVerified) continue; c.innerHTML += `<label class="p-check-label"><input type="checkbox" value="${name}" class="stechen-check" checked> ${name}</label>`; } }
         function generatePowerVoterList() { const c = document.getElementById('powervoter-list'); c.innerHTML = ''; for (const [name, p] of Object.entries(currentPlayers)) { if(!p.isVerified) continue; c.innerHTML += `<label class="p-check-label"><input type="checkbox" value="${name}" class="powervoter-check"> ${name}</label>`; } }
         
-        // Image Toggle Funktion
-        function toggleImage() {
-            // Sende neuen Status an Server
-            socket.emit('gm_toggle_image', !isImageRevealed);
-        }
+        function toggleImage() { socket.emit('gm_toggle_image', !isImageRevealed); }
+        function toggleText() { socket.emit('gm_toggle_text', !isTextRevealed); } 
+        function revealSingle(name) { socket.emit('gm_reveal_single', name); } 
 
         function updateModalFields() {
             const type = document.getElementById('m-type').value;
@@ -372,6 +395,9 @@
                 container.innerHTML = `<div style="padding:15px; background:#eff6ff; color:#1e40af; border:1px solid #bfdbfe; border-radius:6px; margin-top:10px;">ℹ️ Spieler sehen den Stream. Antwortmöglichkeiten sind deaktiviert.</div>`;
             } else if (type === 'OFFLINE_RESULTS') {
                 container.innerHTML = `<div style="padding:15px; background:#eff6ff; color:#1e40af; border:1px solid #bfdbfe; border-radius:6px; margin-top:10px;">ℹ️ Spieler sehen "Warte auf Ergebnisse". Du kannst die Punkte gleich direkt in der Hauptansicht eintragen.</div>`;
+            } else if (type === 'INFO') {
+                container.innerHTML = `<div style="padding:15px; background:#eff6ff; color:#1e40af; border:1px solid #bfdbfe; border-radius:6px; margin-top:10px;">ℹ️ Spieler sehen nur den Text (z.B. Regeln, Story). Keine Interaktion.</div>`;
+                document.getElementById('m-question').placeholder = "Nachricht an Spieler...";
             }
         }
         function addMCRow() { const div = document.createElement('div'); div.className = 'dynamic-row'; div.innerHTML = `<input type="text" class="dyn-inp mc-text" placeholder="Antwort..."><input type="radio" name="mc_correct" class="radio-correct" title="Ist richtige Antwort" style="width:25px; height:25px; accent-color:#16a34a;">`; document.getElementById('mc-inputs').appendChild(div); }
@@ -388,7 +414,7 @@
             const imageUrl = document.getElementById('m-image-url').value.trim(); const imageFile = document.getElementById('m-image-file').files[0];
             
             if (audioUrl) audioData = audioUrl; else if (audioFile) { if (audioFile.size > 500000) { alert("Audio max 500KB"); return; } audioData = await toBase64(audioFile); }
-            if (imageUrl) imageData = imageUrl; else if (imageFile) { if (imageFile.size > 1500000) { alert("Bild max 1.5MB"); return; } imageData = await toBase64(imageFile); }
+            if (imageUrl) imageData = imageUrl; else if (imageFile) { if (imageFile.size > 2000000) { alert("Bild max 2MB"); return; } imageData = await toBase64(imageFile); }
             
             if (document.getElementById('stechen-area').style.display === 'block') { document.querySelectorAll('.stechen-check').forEach(cb => { if (cb.checked) targetPlayers.push(cb.value); }); if (targetPlayers.length === Object.keys(currentPlayers).filter(k=>currentPlayers[k].isVerified).length) targetPlayers = []; }
             
@@ -421,6 +447,8 @@
                 if(!qText) qText = "Live Stream";
             } else if (type === 'OFFLINE_RESULTS') {
                 if(!qText) qText = "Offline Ergebnisse";
+            } else if (type === 'INFO') {
+                if(!qText) qText = "Info";
             }
             
             socket.emit('gm_start_round', { type, question: qText, options, pairs, min, max, answerCount, targetPlayers, correctAnswer, audioData, imageData, videoData, powerVoter });
@@ -511,7 +539,8 @@
             const btnReveal = document.getElementById('btn-reveal');
             
             isAnsweringOpen = round.answeringOpen;
-            isImageRevealed = round.imageRevealed; // State Update
+            isImageRevealed = round.imageRevealed; 
+            isTextRevealed = round.textRevealed;
 
             // Update Image Button Style
             const imgBtn = document.getElementById('btn-img-toggle');
@@ -524,26 +553,50 @@
                 imgText.innerText = "Bild zeigen";
             }
 
+            // Update Text Button Style & Visibility
+            const txtBtn = document.getElementById('btn-text-toggle');
+            const qText = document.getElementById('q-text');
+            if (round.imageData) {
+                txtBtn.style.display = 'flex'; 
+                if (isTextRevealed) {
+                    txtBtn.classList.add('visible');
+                    txtBtn.classList.remove('hidden');
+                    qText.classList.remove('q-text-hidden');
+                } else {
+                    txtBtn.classList.add('hidden');
+                    txtBtn.classList.remove('visible');
+                    qText.classList.add('q-text-hidden');
+                }
+            } else {
+                txtBtn.style.display = 'none';
+                qText.classList.remove('q-text-hidden');
+            }
+
             // --- BUTTON LOGIK ---
-            if (round.type === 'WAITING' || round.type === 'OFFLINE_RESULTS' || round.type === 'VIDEO_STREAM') { 
+            if (round.type === 'WAITING' || round.type === 'OFFLINE_RESULTS' || round.type === 'VIDEO_STREAM' || round.type === 'INFO') { 
                 btnVote.style.display = 'none'; 
                 btnReveal.style.display = 'none'; 
             }
             else if (round.answeringOpen) { 
+                // Phase 1: Voting ist OFFEN
                 btnVote.style.display = 'inline-flex'; 
                 btnVote.innerHTML = '🔒 Voting Schließen';
-                btnVote.className = 'btn-close-vote';
+                btnVote.className = 'btn-close-vote'; // Gelb
                 btnReveal.style.display = 'none'; 
             }
             else { 
+                // Phase 2: Voting GESCHLOSSEN
                 if (round.revealed) {
+                    // Alles schon offen
                     btnVote.style.display = 'none'; 
                     btnReveal.style.display = 'none';
                 } else {
+                    // Geschlossen, aber noch nicht global aufgelöst
+                    btnReveal.style.display = 'inline-block'; // AUFLÖSEN (Jetzt links in der Gruppe durch HTML Tausch)
+                    
                     btnVote.style.display = 'inline-flex';
                     btnVote.innerHTML = '🔓 Wiedereröffnen';
-                    btnVote.className = 'btn-reopen-vote'; 
-                    btnReveal.style.display = 'inline-block';
+                    btnVote.className = 'btn-reopen-vote'; // Grün
                 }
             }
 
@@ -552,7 +605,6 @@
             if (round.audioData) { gmAudioWrapper.style.display = 'block'; if (gmAudio.dataset.src !== round.audioData) { gmAudio.src = round.audioData; gmAudio.dataset.src = round.audioData; } } else { gmAudioWrapper.style.display = 'none'; gmAudio.pause(); gmAudio.src = ""; gmAudio.dataset.src = ""; }
             if (round.imageData) { gmImageWrapper.style.display = 'block'; gmImage.src = round.imageData; } else { gmImageWrapper.style.display = 'none'; gmImage.src = ""; }
             
-            // VIDEO STREAM DISPLAY
             if (round.videoData) {
                 gmVideoWrapper.style.display = 'block';
                 document.getElementById('gm-video-id').innerText = round.videoData;
@@ -583,44 +635,48 @@
                 grid.innerHTML += `<div style="grid-column: 1/-1; background:#dcfce7; color:#14532d; padding:20px; border-radius:12px; border:1px solid #bbf7d0; margin-bottom:15px; display:flex; align-items:center; gap:10px;"><strong>🏆 RICHTIGE ANTWORT:</strong> <span style="font-size:1.3rem; font-weight:bold;">${solText}</span></div>`;
             }
             
-            if (round.type === 'PLAYER_VOTE') {
-                const votes = {};
-                let maxVotes = 0;
-                for (const [voterName, p] of Object.entries(players)) {
-                    if (p.hasAnswered && p.answer) {
-                        const target = p.answer;
-                        if (!votes[target]) votes[target] = 0;
-                        let weight = 1;
-                        if (round.powerVoter && Array.isArray(round.powerVoter) && round.powerVoter.includes(voterName)) weight = 2;
-                        votes[target] += weight;
-                        if (votes[target] > maxVotes) maxVotes = votes[target];
-                    }
-                }
-                
-                if (round.revealed) {
-                    const sorted = Object.entries(votes).sort((a,b) => b[1] - a[1]);
-                    let summaryHtml = `<div style="grid-column: 1/-1; margin-bottom:15px; background:white; padding:20px; border-radius:12px; border:1px solid #e5e7eb;"><h3>📊 Auswertung:</h3>`;
-                    sorted.forEach(([name, count]) => {
-                        const isLeader = count === maxVotes;
-                        const style = isLeader ? "background:#fee2e2; color:#b91c1c; font-weight:bold; border:1px solid #fecaca;" : "background:#f3f4f6; color:#4b5563;";
-                        const icon = isLeader ? "💀 " : "";
-                        summaryHtml += `<div style="padding:12px; margin-bottom:5px; border-radius:6px; display:flex; justify-content:space-between; ${style}"><span>${icon}${name}</span><span>${count} Stimmen</span></div>`;
-                    });
-                    summaryHtml += `</div>`;
-                    grid.innerHTML += summaryHtml;
-                }
+            // --- ANSWER GRID ---
+            let count = 0;
+            // Create array from players to sort them
+            let playerList = Object.entries(players).map(([name, p]) => ({name, ...p}));
+            
+            // Sorting Logic
+            if (round.revealedAnswers && round.revealedAnswers.length > 0) {
+                 playerList.sort((a, b) => {
+                     const idxA = round.revealedAnswers.indexOf(a.name);
+                     const idxB = round.revealedAnswers.indexOf(b.name);
+                     if (idxA !== -1 && idxB !== -1) return idxB - idxA;
+                     if (idxA !== -1) return -1;
+                     if (idxB !== -1) return 1;
+                     return 0; 
+                 });
             }
 
-            let count = 0;
-            for (const [name, p] of Object.entries(players)) {
+            for (const p of playerList) {
+                const name = p.name;
                 if (p.hasAnswered) count++;
                 if (p.hasAnswered && p.answer) {
                     const card = document.createElement('div'); card.className = 'answer-card';
-                    let displayAnswer = p.answer;
                     
+                    const isRevealed = round.revealedAnswers && round.revealedAnswers.includes(name);
+                    const isGlobal = round.revealed;
+                    
+                    if (isRevealed) {
+                        card.classList.add('answer-revealed');
+                    }
+
+                    if (!isGlobal && !isRevealed) {
+                        const btn = document.createElement('button');
+                        btn.className = 'btn-reveal-single';
+                        btn.innerHTML = '👁️';
+                        btn.onclick = () => revealSingle(name);
+                        card.appendChild(btn);
+                    }
+
+                    let displayAnswer = p.answer;
                     // SCHÄTZEN DIFFERENZ LOGIK
                     let diffBadge = "";
-                    if (round.type === 'ESTIMATE' && round.correctAnswer !== null && round.revealed) {
+                    if (round.type === 'ESTIMATE' && round.correctAnswer !== null && (isGlobal || isRevealed)) {
                          const correct = Number(round.correctAnswer);
                          const given = Number(p.answer);
                          if (!isNaN(correct) && !isNaN(given)) {
@@ -632,13 +688,12 @@
                     if (round.type === 'MATCHING' && typeof p.answer === 'object') {
                         displayAnswer = '<ul style="margin:0; padding-left:20px;">'; for(const [k, v] of Object.entries(p.answer)) displayAnswer += `<li>${k} ➝ <b>${v}</b></li>`; displayAnswer += '</ul>';
                     } else if (Array.isArray(p.answer)) {
-                        // Bei LIST als Liste anzeigen
                         if(round.type === 'LIST') displayAnswer = '<ol style="margin:0; padding-left:20px;">' + p.answer.map(a => `<li>${a}</li>`).join('') + '</ol>';
                         else displayAnswer = p.answer.join(" → ");
                     }
                     
                     if (round.type === 'PLAYER_VOTE') { card.style.borderLeft = "6px solid #ef4444"; card.innerHTML = `<strong>${name} wählt:</strong><div style="font-size:1.5rem; font-weight:bold;">${p.answer}</div>`; }
-                    else card.innerHTML = `<strong>${name}</strong><div class="answer-val" style="color:#2563eb;">${displayAnswer}${diffBadge}</div>`;
+                    else card.innerHTML += `<strong>${name}</strong><div class="answer-val" style="color:#2563eb;">${displayAnswer}${diffBadge}</div>`;
                     grid.appendChild(card);
                 }
             }
