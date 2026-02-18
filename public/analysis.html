@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Spiel-Auswertung</title>
+    <title>Spiel-Auswertung: Einzelansicht</title>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; background: #1a1a1a; color: #e0e0e0; display: flex; height: 100vh; }
         
@@ -55,53 +55,48 @@
     <div class="sidebar">
         <div class="sidebar-header">SPIEL-ARCHIV</div>
         <div id="game-list">
-            <div class="loading">Lade Spiele...</div>
+            <!-- Wird per JS gefüllt -->
         </div>
     </div>
 
     <div class="content" id="content-area">
         <div style="text-align:center; color:#555; margin-top:100px;">
-            <h2>Wähle ein Spiel aus der Liste</h2>
-            <p>Links klicken, um Details zu laden.</p>
+            <h2>Bitte Spiel links auswählen</h2>
+            <p>Klicken, um Details zu laden.</p>
         </div>
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io();
+        const FIXED_GAME_ID = "game_1771440909023";
 
-        socket.on('connect', () => {
-            console.log("Verbunden. Lade Liste...");
-            socket.emit('request_gamelist');
+        // Sobald die Seite geladen ist, rendern wir den statischen Button
+        document.addEventListener('DOMContentLoaded', () => {
+            renderStaticSidebar();
         });
 
-        socket.on('receive_gamelist', (games) => {
+        socket.on('connect', () => {
+            console.log("Verbunden. Bereit für Abfragen.");
+            // Wir fragen KEINE Liste mehr an ('request_gamelist' entfernt)
+        });
+
+        function renderStaticSidebar() {
             const list = document.getElementById('game-list');
             list.innerHTML = '';
             
-            if(games.length === 0) {
-                list.innerHTML = '<div style="padding:20px; color:#666; text-align:center;">Keine Spiele gefunden.</div>';
-                return;
-            }
-
-            games.forEach((game, index) => {
-                const el = document.createElement('div');
-                el.className = 'game-item';
-                
-                // Datum sicher formatieren
-                let dateStr = "Unbekannt";
-                try {
-                    dateStr = new Date(game.date).toLocaleString('de-DE');
-                } catch(e) {}
-
-                el.innerHTML = `
-                    <div class="game-date">${dateStr}</div>
-                    <div class="game-id">${game.id} • ${game.playersCount} Spieler</div>
-                `;
-                el.onclick = () => loadGame(game.id, el);
-                list.appendChild(el);
-            });
-        });
+            const el = document.createElement('div');
+            el.className = 'game-item';
+            
+            // Da wir keine Metadaten (Datum/Spieleranzahl) haben, bevor wir draufklicken,
+            // setzen wir hier Platzhalter-Texte ein.
+            el.innerHTML = `
+                <div class="game-date">Gespeichertes Spiel</div>
+                <div class="game-id">${FIXED_GAME_ID}</div>
+            `;
+            el.onclick = () => loadGame(FIXED_GAME_ID, el);
+            list.appendChild(el);
+        }
 
         function loadGame(gameId, element) {
             document.querySelectorAll('.game-item').forEach(e => e.classList.remove('active'));
@@ -109,6 +104,7 @@
             
             document.getElementById('content-area').innerHTML = '<div class="loading">Lade Daten für ' + gameId + '...</div>';
             
+            // Die Detail-Abfrage bleibt gleich, da der Server die ID ja kennt
             socket.emit('request_game_details', gameId);
         }
 
