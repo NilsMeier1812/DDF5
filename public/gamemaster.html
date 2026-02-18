@@ -238,7 +238,7 @@
             <div class="answers-grid" id="answers-area"></div>
             
             <div id="offline-input-area" style="display:none; background: #fff7ed; padding:25px; border-radius:12px; margin-top:30px; border:1px solid #ffedd5;">
-                <h3 style="color:#9a3412; margin-top:0;">📝 Offline Ergebnisse eintragen</h3>
+                <h3 style="color:#9a3412; margin-top:0;">📝 Ergebnisse eintragen</h3>
                 <div id="offline-player-inputs"></div>
                 <button class="btn-new-q" onclick="saveOfflineResults()" style="background:#ea580c; margin-top:15px;">Ergebnisse Speichern</button>
             </div>
@@ -257,20 +257,20 @@
                 <select id="m-type" onchange="updateModalFields()">
                     <!-- NEUE GRUPPIERUNG & SORTIERUNG -->
                     <optgroup label="Interaktiv / Fragen">
-                        <option value="MC">Multiple Choice</option>
-                        <option value="ESTIMATE">Schätzen (Zahl)</option>
-                        <option value="TEXT">Freitext</option>
-                        <option value="LIST">Aufzählen (Liste)</option>
+                        <option value="TEXT">Textantwort</option>
                         <option value="SEQUENCE">Reihenfolge (Sortieren)</option>
+                        <option value="LIST">Aufzählen (Liste)</option>
+                        <option value="ESTIMATE">Schätzen (Zahl)</option>
+                        <option value="MC">Multiple Choice</option>
                         <option value="MATCHING">Zuordnen (Paare)</option>
-                    </optgroup>
-                    <optgroup label="Voting / Elimination">
-                        <option value="PLAYER_VOTE">Voting (Leben abziehen)</option>
                     </optgroup>
                     <optgroup label="Content / Passive">
                         <option value="INFO">Info / Text anzeigen</option> <!-- NEU -->
-                        <option value="VIDEO_STREAM">Video Stream (YouTube)</option>
+                        <option value="VIDEO_STREAM">🔴Video Stream (YouTube)</option>
                         <option value="OFFLINE_RESULTS">Offline Ergebnisse</option>
+                    </optgroup>
+                    <optgroup label="Voting / Elimination">
+                        <option value="PLAYER_VOTE">❤️Voting (Leben abziehen)</option>
                     </optgroup>
                 </select>
             </div>
@@ -288,13 +288,13 @@
             </div>
 
             <div class="media-box">
-                <label>🎧 Audio (Optional)</label>
+                <label>🎧 Audio</label>
                 <div style="display:flex; gap:10px;">
                     <input type="text" id="m-audio-url" placeholder="URL (z.B. .mp3)" style="flex:1;">
                     <input type="file" id="m-audio-file" accept="audio/*" style="font-size:0.8rem; width:200px;">
                 </div>
                 <hr style="border:0; border-top:1px solid #bae6fd; margin:15px 0;">
-                <label>🖼️ Bild (Optional)</label>
+                <label>🖼️ Bild</label>
                 <div style="display:flex; gap:10px;">
                     <input type="text" id="m-image-url" placeholder="URL (z.B. .jpg)" style="flex:1;">
                     <input type="file" id="m-image-file" accept="image/*" style="font-size:0.8rem; width:200px;">
@@ -303,8 +303,8 @@
             </div>
 
             <div style="display:flex; gap:10px; flex-wrap:wrap;">
-                <button class="btn-mini" style="width:auto;" onclick="toggleStechen()">⚔️ Zielgruppe einschränken (Stechen)</button>
-                <button class="btn-mini" style="width:auto;" onclick="togglePowerVoter()">⚡ Power-Voter (Doppelte Stimme)</button>
+                <button class="btn-mini" style="width:auto;" onclick="toggleStechen()">⚔️ Stechen</button>
+                <button class="btn-mini" style="width:auto;" onclick="togglePowerVoter()">⚡ Doppelte Stimme</button>
             </div>
 
             <div id="stechen-area" style="display:none; background:#f9fafb; padding:15px; border-radius:8px; border:1px solid #e5e7eb;">
@@ -327,7 +327,6 @@
             </div>
         </div>
         <div class="modal-footer">
-            <button class="btn-reset-round" onclick="startRound(true)">⚠️ Reset Game State</button>
             <div style="display:flex; gap:10px;">
                 <button class="btn-cancel" onclick="closeModal()">Abbrechen</button>
                 <button class="btn-start" onclick="startQuestion()">Frage Starten</button>
