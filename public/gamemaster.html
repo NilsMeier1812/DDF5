@@ -96,19 +96,36 @@
 
         /* ANSWERS GRID */
         .answers-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
-        .answer-card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); border: 1px solid #f3f4f6; position: relative; overflow: hidden; display: flex; flex-direction: column; }
+        .answer-card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); border: 1px solid #f3f4f6; position: relative; overflow: hidden; display: flex; flex-direction: column; transition: all 0.3s ease; }
         .answer-card strong { display: block; color: #6b7280; font-size: 0.85rem; margin-bottom: 8px; text-transform: uppercase; }
         .answer-val { font-size: 1.2rem; font-weight: 600; color: #111; white-space: pre-wrap; line-height: 1.4; flex: 1;}
         .diff-badge { background: #fee2e2; color: #b91c1c; font-size: 0.8rem; padding: 2px 6px; border-radius: 4px; font-weight: bold; margin-left: 8px; border: 1px solid #fecaca; }
         
-        .answer-revealed { border: 2px solid #22c55e; background: #f0fdf4; order: -1; } /* Grüne Umrandung & nach oben */
+        /* REVEALED STYLE */
+        .answer-revealed { 
+            border: 2px solid #22c55e; 
+            background: #f0fdf4; 
+            order: -1; 
+            transform: scale(1.02);
+            box-shadow: 0 10px 15px -3px rgba(34, 197, 94, 0.2);
+        } 
 
+        /* Reveal Button Styling */
         .btn-reveal-single { 
             position: absolute; top: 10px; right: 10px; 
-            background: #e5e7eb; border: none; border-radius: 50%; width: 30px; height: 30px; 
+            background: #e5e7eb; border: none; border-radius: 50%; width: 32px; height: 32px; 
             cursor: pointer; display: flex; align-items: center; justify-content: center;
+            font-size: 1.1rem;
+            transition: all 0.2s;
         }
-        .btn-reveal-single:hover { background: #d1d5db; }
+        .btn-reveal-single:hover { background: #d1d5db; transform: scale(1.1); }
+        
+        /* Checked / Done State */
+        .btn-reveal-single.checked {
+            background: #22c55e;
+            color: white;
+            cursor: default;
+        }
 
         /* TOASTS */
         #notification-area { position: fixed; bottom: 20px; right: 20px; width: 320px; z-index: 3000; display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
@@ -546,6 +563,7 @@
             });
             if (pending.length > 0) { list.innerHTML += `<div class="pending-header">Beitrittsanfragen</div>`; pending.forEach(p => list.innerHTML += `<div class="pending-row"><div><strong>${p.name}</strong></div><div style="font-family:monospace; font-weight:bold;">${p.code}</div></div>`); }
         }
+        
         function renderMainArea(round, players) {
             const btnVote = document.getElementById('btn-toggle-vote'); 
             const btnReveal = document.getElementById('btn-reveal');
@@ -621,7 +639,7 @@
                     btnReveal.style.display = 'none';
                 } else {
                     // Geschlossen, aber noch nicht global aufgelöst
-                    btnReveal.style.display = 'inline-block'; // AUFLÖSEN (Jetzt links in der Gruppe durch HTML Tausch)
+                    btnReveal.style.display = 'inline-block'; // AUFLÖSEN
                     
                     btnVote.style.display = 'inline-flex';
                     btnVote.innerHTML = '🔓 Wiedereröffnen';
@@ -669,17 +687,27 @@
             // Create array from players to sort them
             let playerList = Object.entries(players).map(([name, p]) => ({name, ...p}));
             
-            // Sorting Logic
-            if (round.revealedAnswers && round.revealedAnswers.length > 0) {
-                 playerList.sort((a, b) => {
-                     const idxA = round.revealedAnswers.indexOf(a.name);
-                     const idxB = round.revealedAnswers.indexOf(b.name);
-                     if (idxA !== -1 && idxB !== -1) return idxB - idxA;
-                     if (idxA !== -1) return -1;
-                     if (idxB !== -1) return 1;
-                     return 0; 
-                 });
-            }
+            // NEW SORTING LOGIC: REVEALED FIRST (LIFO)
+            playerList.sort((a, b) => {
+                const revealed = round.revealedAnswers || [];
+                const idxA = revealed.indexOf(a.name);
+                const idxB = revealed.indexOf(b.name);
+                
+                // Beide sind aufgedeckt -> Der mit dem höheren Index (später aufgedeckt) kommt nach oben
+                if (idxA !== -1 && idxB !== -1) return idxB - idxA;
+                
+                // Nur A ist aufgedeckt -> A nach oben
+                if (idxA !== -1) return -1;
+                
+                // Nur B ist aufgedeckt -> B nach oben
+                if (idxB !== -1) return 1;
+                
+                // Fallback: Wer hat geantwortet?
+                if (a.hasAnswered && !b.hasAnswered) return -1;
+                if (!a.hasAnswered && b.hasAnswered) return 1;
+                
+                return 0; 
+            });
 
             for (const p of playerList) {
                 const name = p.name;
@@ -694,11 +722,23 @@
                         card.classList.add('answer-revealed');
                     }
 
-                    if (!isGlobal && !isRevealed) {
+                    // --- BUTTON LOGIC CHANGE ---
+                    // Button only visible if voting is closed AND not globally revealed
+                    if (!round.answeringOpen && !isGlobal) {
                         const btn = document.createElement('button');
                         btn.className = 'btn-reveal-single';
-                        btn.innerHTML = '👁️';
-                        btn.onclick = () => revealSingle(name);
+                        
+                        if (isRevealed) {
+                            // If already revealed -> Green Checkmark (Toggle state)
+                            btn.innerHTML = '✔️';
+                            btn.classList.add('checked');
+                            // Optional: Click again resets? Currently prompt just says "toggle", usually means turn on.
+                            // If you want un-reveal, add logic here. For now, keep it simple.
+                        } else {
+                            // Not revealed -> Eye
+                            btn.innerHTML = '👁️';
+                            btn.onclick = () => revealSingle(name);
+                        }
                         card.appendChild(btn);
                     }
 
