@@ -442,7 +442,8 @@
             const audioUrl = document.getElementById('m-audio-url').value.trim(); const audioFile = document.getElementById('m-audio-file').files[0];
             const imageUrl = document.getElementById('m-image-url').value.trim(); const imageFile = document.getElementById('m-image-file').files[0];
             
-            if (audioUrl) audioData = audioUrl; else if (audioFile) { if (audioFile.size > 500000) { alert("Audio max 500KB"); return; } audioData = await toBase64(audioFile); }
+            // --- UPDATE: Limit erhöht auf 1MB (1.000.000 Bytes) ---
+            if (audioUrl) audioData = audioUrl; else if (audioFile) { if (audioFile.size > 1000000) { alert("Audio max 1MB"); return; } audioData = await toBase64(audioFile); }
             if (imageUrl) imageData = imageUrl; else if (imageFile) { if (imageFile.size > 2000000) { alert("Bild max 2MB"); return; } imageData = await toBase64(imageFile); }
             
             if (document.getElementById('stechen-area').style.display === 'block') { document.querySelectorAll('.stechen-check').forEach(cb => { if (cb.checked) targetPlayers.push(cb.value); }); if (targetPlayers.length === Object.keys(currentPlayers).filter(k=>currentPlayers[k].isVerified).length) targetPlayers = []; }
