@@ -280,7 +280,7 @@
         </div>
         
         <div id="spectator-screen">
-            <div style="font-size:4rem; margin-bottom: 10px;">👀</div>
+            <div style="font-size:4rem; margin-bottom: 10px;">💀</div>
             <h2>Zuschauer</h2>
             <p>Du nimmst an dieser speziellen Frage nicht teil.</p>
         </div>
@@ -822,7 +822,21 @@
         function initEstimate(min, max) { const inp = document.getElementById('est-val'); const sli = document.getElementById('est-slide'); inp.min = min; inp.max = max; inp.value = ''; sli.min = min; sli.max = max; sli.value = min; window.syncEst = (val) => { inp.value = val; }; inp.oninput = () => { sli.value = inp.value; }; }
 
         function renderPlayerCards(players) {
-            const container = document.getElementById('vote-player-list'); container.innerHTML = '';
+            const container = document.getElementById('vote-player-list');
+            
+            // --- FIX START: STATE PERSISTENCE ---
+            // Wir merken uns, welche Karten offen sind (Klasse 'show' auf .vote-history)
+            const currentlyOpen = new Set();
+            document.querySelectorAll('.vote-card').forEach(card => {
+                const nameEl = card.querySelector('.vote-name');
+                const historyEl = card.querySelector('.vote-history');
+                if (nameEl && historyEl && historyEl.classList.contains('show')) {
+                    currentlyOpen.add(nameEl.innerText.trim());
+                }
+            });
+            // --- FIX END ---
+
+            container.innerHTML = '';
             let count = 0;
             for (const name in players) {
                 if(name === username) continue;
@@ -837,8 +851,15 @@
                         historyHTML += `<div class="history-item" style="margin-bottom:5px; border-bottom:1px solid #333; padding-bottom:5px;"><span class="h-q" style="display:block; color:#888; font-size:0.8rem;">${index+1}. ${roundData.question}</span><span class="h-a" style="color:var(--accent-color);">${ans}</span></div>`;
                     });
                 }
+                
+                // --- FIX START: RESTORE STATE ---
+                const isOpen = currentlyOpen.has(name);
+                const historyClass = isOpen ? 'vote-history show' : 'vote-history';
+                const btnBg = isOpen ? 'background:#555' : 'background:#333';
+                // --- FIX END ---
+
                 const card = document.createElement('div'); card.className = 'vote-card';
-                card.innerHTML = `<div class="vote-card-header"><div class="vote-name">${name}</div><div style="display:flex;"><button class="btn-inspect" onclick="toggleHistory(this)">ℹ️</button><button class="btn-vote-action" onclick="sendAnswer('${name}')">WÄHLEN</button></div></div><div class="vote-history">${historyHTML}</div>`;
+                card.innerHTML = `<div class="vote-card-header"><div class="vote-name">${name}</div><div style="display:flex;"><button class="btn-inspect" onclick="toggleHistory(this)" style="${btnBg}">ℹ️</button><button class="btn-vote-action" onclick="sendAnswer('${name}')">WÄHLEN</button></div></div><div class="${historyClass}">${historyHTML}</div>`;
                 container.appendChild(card);
             }
             if(count === 0) {
