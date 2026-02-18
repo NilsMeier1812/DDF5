@@ -152,9 +152,10 @@
         .est-range { width: 100%; accent-color: var(--accent-color); height: 6px; }
 
         /* Results & Status */
-        .result-card { background: var(--card-color); padding: 15px; border-radius: 10px; border-left: 4px solid var(--accent-color); display: flex; justify-content: space-between; align-items: center; }
+        .result-card { background: var(--card-color); padding: 15px; border-radius: 10px; border-left: 4px solid var(--accent-color); display: flex; justify-content: space-between; align-items: center; transition: all 0.3s ease; animation: fadeIn 0.5s; }
         .res-val { font-weight: bold; font-size: 1.1rem; }
         .correct-answer-card { background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid #22c55e; padding: 20px; border-radius: var(--radius); text-align: center; margin-bottom: 20px; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
         /* Overlays */
         #locked-screen, #spectator-screen, #eliminated-screen { 
@@ -519,20 +520,11 @@
                 if (round.type === 'PLAYER_VOTE') renderPlayerCards(data.players); 
             }
 
-            // NEU: INPUT BLOCK CHECK
-            // Das machen wir NACH switchMode, damit die Elemente da sind
             if (round.isInputBlocked && !round.revealed) {
                 document.querySelectorAll('.mode-container').forEach(el => el.classList.remove('active'));
                 document.getElementById('input-blocked-msg').style.display = 'block';
             } else {
                 document.getElementById('input-blocked-msg').style.display = 'none';
-                // Hier müssen wir den aktuellen Modus wieder aktivieren, falls wir ihn gerade versteckt hatten
-                // aber switchMode wurde oben schon aufgerufen.
-                // Ein einfacher Hack: wir rufen switchMode nochmal auf oder prüfen welcher aktiv sein sollte
-                // Aber da switchMode 'lastRoundSignature' prüft, wird es vllt nicht feuern.
-                // Besser: Wir togglen visibility per CSS Klasse auf den active container
-                
-                // Da wir oben "forEach remove active" gemacht haben, müssen wir sicherstellen, dass der richtige Mode sichtbar ist, wenn NICHT geblockt
                  if (!round.isInputBlocked) {
                      const activeModeId = 'mode-' + round.type.toLowerCase();
                      const el = document.getElementById(activeModeId);
@@ -744,11 +736,30 @@
                 solDiv.innerHTML = `<div class="correct-answer-card"><strong>🏆 LÖSUNG</strong><br><span style="font-size:1.2rem;">${txt}</span></div>`;
             } else solDiv.innerHTML = '';
             
-            for(const [name, p] of Object.entries(allPlayers)) {
+            // SORTIERUNG EINBAUEN: LIFO (wie im GM)
+            let playerList = Object.entries(allPlayers).map(([name, p]) => ({name, ...p}));
+            
+            playerList.sort((a, b) => {
+                const revealed = roundData.revealedAnswers || [];
+                const idxA = revealed.indexOf(a.name);
+                const idxB = revealed.indexOf(b.name);
+                
+                // Beide sind aufgedeckt -> Der mit dem höheren Index (später aufgedeckt) kommt nach oben
+                if (idxA !== -1 && idxB !== -1) return idxB - idxA;
+                
+                // Nur A ist aufgedeckt -> A nach oben
+                if (idxA !== -1) return -1;
+                // Nur B ist aufgedeckt -> B nach oben
+                if (idxB !== -1) return 1;
+                
+                return 0; // Beide nicht aufgedeckt
+            });
+
+            for(const p of playerList) {
                 if(p.answer) {
                     let ans = formatAnswer(p.answer); let extras = "";
                     if(roundData.type === 'ESTIMATE' && roundData.correctAnswer) { const diff = Math.abs(Number(p.answer) - Number(roundData.correctAnswer)); extras = `<span style="color:var(--danger-color); font-weight:bold;"> (Diff: ${diff})</span>`; }
-                    cont.innerHTML += `<div class="result-card"><div class="res-name">${name}</div><div class="res-val">${ans} ${extras}</div></div>`;
+                    cont.innerHTML += `<div class="result-card"><div class="res-name">${p.name}</div><div class="res-val">${ans} ${extras}</div></div>`;
                 }
             }
         }
