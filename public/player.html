@@ -286,6 +286,13 @@
                 <p>Live Video</p>
             </div>
         </div>
+        
+        <!-- INFO MODE -->
+        <div id="mode-info" class="mode-container">
+            <div style="text-align: center; padding: 20px; color:#aaa; font-style:italic;">
+                <p>Lies die Informationen auf dem Bildschirm.</p>
+            </div>
+        </div>
 
         <!-- Inputs -->
         <div id="mode-mc" class="mode-container">
@@ -450,19 +457,29 @@
 
             updateStatusBar(round, data.players, me);
 
-            if (round.revealed) { 
+            // TEXT VISIBILITY CHECK
+            if (round.textRevealed) {
+                document.getElementById('display-question').innerText = round.question || "Pause";
+            } else {
+                document.getElementById('display-question').innerText = "???";
+            }
+
+            // REVEAL LOGIC UPDATE
+            const hasIndividualReveals = round.revealedAnswers && round.revealedAnswers.length > 0;
+            
+            if (round.revealed || hasIndividualReveals) { 
                 document.getElementById('locked-screen').classList.remove('visible'); 
                 switchMode('RESULTS', round, data.players); 
                 return; 
             }
-            if (!round.answeringOpen && round.type !== 'WAITING' && round.type !== 'VIDEO_STREAM') { 
+            if (!round.answeringOpen && round.type !== 'WAITING' && round.type !== 'VIDEO_STREAM' && round.type !== 'INFO') { 
                 document.getElementById('locked-screen').classList.add('visible'); 
                 return; 
             } else { 
                 document.getElementById('locked-screen').classList.remove('visible'); 
             }
             
-            const currentSignature = round.type + "::" + round.question + "::" + JSON.stringify(round.options || []) + "::" + (round.imageData ? "IMG" : "NOIMG") + "::" + (round.audioData ? "AUDIO" : "NOAUDIO") + "::" + (round.videoData || "NOVIDEO") + "::" + round.answerCount + "::" + round.imageRevealed;
+            const currentSignature = round.type + "::" + round.question + "::" + JSON.stringify(round.options || []) + "::" + (round.imageData ? "IMG" : "NOIMG") + "::" + (round.audioData ? "AUDIO" : "NOAUDIO") + "::" + (round.videoData || "NOVIDEO") + "::" + round.answerCount + "::" + round.imageRevealed + "::" + round.textRevealed;
             if (currentSignature !== lastRoundSignature) { 
                 lastRoundSignature = currentSignature; 
                 switchMode(round.type, round, data.players); 
@@ -499,7 +516,7 @@
         function updateStatusBar(round, allPlayers, me) {
             const statusBar = document.getElementById('status-progress');
             
-            if (round.type === 'WAITING' || round.revealed || round.type === 'OFFLINE_RESULTS' || round.type === 'VIDEO_STREAM') {
+            if (round.type === 'WAITING' || round.revealed || round.type === 'OFFLINE_RESULTS' || round.type === 'VIDEO_STREAM' || round.type === 'INFO') {
                 statusBar.style.display = 'none';
                 return;
             }
@@ -550,7 +567,7 @@
         
         function switchMode(type, roundData, allPlayers) {
             hideAllModes(); 
-            document.getElementById('display-question').innerText = roundData.question || "Pause";
+            // Question text update moved to main loop to handle toggle state
             
             const audioDiv = document.getElementById('audio-container');
             if (roundData.audioData) {
@@ -594,6 +611,8 @@
                 else { document.getElementById('mode-offline').classList.add('active'); return; }
             } else if (type === 'VIDEO_STREAM') {
                 document.getElementById('mode-stream').classList.add('active');
+            } else if (type === 'INFO') { // NEW
+                document.getElementById('mode-info').classList.add('active');
             } else if (type === 'RESULTS') {
                 document.getElementById('mode-results').classList.add('active');
                 renderResultsTable(allPlayers, roundData);
