@@ -722,27 +722,10 @@
                         card.classList.add('answer-revealed');
                     }
 
-                    // --- BUTTON LOGIC CHANGE ---
-                    // Button only visible if voting is closed AND not globally revealed
-                    if (!round.answeringOpen && !isGlobal) {
-                        const btn = document.createElement('button');
-                        btn.className = 'btn-reveal-single';
-                        
-                        if (isRevealed) {
-                            // If already revealed -> Green Checkmark (Toggle state)
-                            btn.innerHTML = '✔️';
-                            btn.classList.add('checked');
-                            // Optional: Click again resets? Currently prompt just says "toggle", usually means turn on.
-                            // If you want un-reveal, add logic here. For now, keep it simple.
-                        } else {
-                            // Not revealed -> Eye
-                            btn.innerHTML = '👁️';
-                            btn.onclick = () => revealSingle(name);
-                        }
-                        card.appendChild(btn);
-                    }
-
+                    // --- CONTENT GENERATION FIRST ---
+                    let contentHtml = '';
                     let displayAnswer = p.answer;
+                    
                     // SCHÄTZEN DIFFERENZ LOGIK
                     let diffBadge = "";
                     if (round.type === 'ESTIMATE' && round.correctAnswer !== null && (isGlobal || isRevealed)) {
@@ -761,8 +744,34 @@
                         else displayAnswer = p.answer.join(" → ");
                     }
                     
-                    if (round.type === 'PLAYER_VOTE') { card.style.borderLeft = "6px solid #ef4444"; card.innerHTML = `<strong>${name} wählt:</strong><div style="font-size:1.5rem; font-weight:bold;">${p.answer}</div>`; }
-                    else card.innerHTML += `<strong>${name}</strong><div class="answer-val" style="color:#2563eb;">${displayAnswer}${diffBadge}</div>`;
+                    if (round.type === 'PLAYER_VOTE') { 
+                        card.style.borderLeft = "6px solid #ef4444"; 
+                        contentHtml = `<strong>${name} wählt:</strong><div style="font-size:1.5rem; font-weight:bold;">${p.answer}</div>`; 
+                    } else {
+                        contentHtml = `<strong>${name}</strong><div class="answer-val" style="color:#2563eb;">${displayAnswer}${diffBadge}</div>`;
+                    }
+
+                    // Set innerHTML first!
+                    card.innerHTML = contentHtml;
+
+                    // --- BUTTON GENERATION LAST ---
+                    // Button only visible if voting is closed AND not globally revealed
+                    if (!round.answeringOpen && !isGlobal) {
+                        const btn = document.createElement('button');
+                        btn.className = 'btn-reveal-single';
+                        
+                        if (isRevealed) {
+                            // If already revealed -> Green Checkmark (Toggle state)
+                            btn.innerHTML = '✔️';
+                            btn.classList.add('checked');
+                        } else {
+                            // Not revealed -> Eye
+                            btn.innerHTML = '👁️';
+                            btn.onclick = () => revealSingle(name);
+                        }
+                        card.appendChild(btn); // Now appendChild works safely!
+                    }
+
                     grid.appendChild(card);
                 }
             }
