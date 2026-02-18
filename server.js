@@ -39,6 +39,7 @@ const DEFAULT_ROUND = {
     min: 0, max: 100, 
     answerCount: 1, 
     revealed: false, answeringOpen: false, 
+    isInputBlocked: false, // NEU: Status für Eingabesperre
     correctAnswer: null,
     audioData: null, 
     imageData: null,
@@ -113,6 +114,7 @@ async function loadGameData() {
                 powerVoter: loadedRound.powerVoter || [],
                 imageRevealed: loadedRound.imageRevealed || false,
                 textRevealed: loadedRound.textRevealed !== undefined ? loadedRound.textRevealed : true,
+                isInputBlocked: loadedRound.isInputBlocked || false, // NEU laden
                 revealedAnswers: loadedRound.revealedAnswers || []
             };
             
@@ -279,6 +281,13 @@ io.on('connection', (socket) => {
         broadcastState();
     });
 
+    // NEU: Input Sperre umschalten
+    socket.on('gm_toggle_input_block', (isBlocked) => {
+        currentRound.isInputBlocked = isBlocked;
+        saveGame();
+        broadcastState();
+    });
+
     socket.on('gm_reveal_single', (playerName) => {
         if (!currentRound.revealedAnswers.includes(playerName)) {
             currentRound.revealedAnswers.push(playerName);
@@ -351,6 +360,11 @@ io.on('connection', (socket) => {
             shouldOpen = false;
         }
 
+        // NEU: Wenn ein Bild dabei ist, standardmäßig erstmal blockieren?
+        // Oder wir lassen es offen und der GM blockiert manuell. 
+        // Für den Workflow "Erst Bild, dann tippen" ist manuell flexibler.
+        // Wir setzen isInputBlocked standardmäßig auf FALSE, der GM kann klicken.
+
         currentRound = {
             type: data.type,
             question: data.question,
@@ -370,7 +384,8 @@ io.on('connection', (socket) => {
             powerVoter: data.powerVoter || [],
             revealedAnswers: [], 
             revealed: false,
-            answeringOpen: shouldOpen, 
+            answeringOpen: shouldOpen,
+            isInputBlocked: false, // Standard offen
             startTime: Date.now(), 
             endTime: null
         };
@@ -476,7 +491,9 @@ io.on('connection', (socket) => {
         if (!p || !p.isVerified) return;
         if (p.lives <= 0) return;
         if (currentRound.targetPlayers?.length > 0 && !currentRound.targetPlayers.includes(data.user)) return;
-        if (currentRound.answeringOpen) {
+        
+        // NEU: Nur erlauben, wenn nicht geblockt
+        if (currentRound.answeringOpen && !currentRound.isInputBlocked) {
             p.answer = data.answer;
             p.hasAnswered = true;
             saveGame();
