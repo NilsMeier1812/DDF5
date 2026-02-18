@@ -39,7 +39,7 @@ const DEFAULT_ROUND = {
     min: 0, max: 100, 
     answerCount: 1, 
     revealed: false, answeringOpen: false, 
-    isInputBlocked: false, 
+    isInputBlocked: false, // NEU: Status für Eingabesperre
     correctAnswer: null,
     audioData: null, 
     imageData: null,
