@@ -39,7 +39,7 @@ const DEFAULT_ROUND = {
     min: 0, max: 100, 
     answerCount: 1, 
     revealed: false, answeringOpen: false, 
-    isInputBlocked: false, // NEU: Status für Eingabesperre
+    isInputBlocked: false, 
     correctAnswer: null,
     audioData: null, 
     imageData: null,
@@ -47,7 +47,7 @@ const DEFAULT_ROUND = {
     textRevealed: true, 
     videoData: null,
     powerVoter: [],
-    revealedAnswers: [], 
+    revealedAnswers: [], // Liste der Namen, die einzeln aufgedeckt wurden
     startTime: null, 
     endTime: null    
 };
@@ -114,7 +114,7 @@ async function loadGameData() {
                 powerVoter: loadedRound.powerVoter || [],
                 imageRevealed: loadedRound.imageRevealed || false,
                 textRevealed: loadedRound.textRevealed !== undefined ? loadedRound.textRevealed : true,
-                isInputBlocked: loadedRound.isInputBlocked || false, // NEU laden
+                isInputBlocked: loadedRound.isInputBlocked || false,
                 revealedAnswers: loadedRound.revealedAnswers || []
             };
             
@@ -167,6 +167,7 @@ io.on('connection', (socket) => {
                 
                 let answerVisible = null;
                 const isGloballyRevealed = currentRound.revealed;
+                // Prüfen, ob dieser spezifische Spieler aufgedeckt wurde
                 const isIndividuallyRevealed = currentRound.revealedAnswers && currentRound.revealedAnswers.includes(name);
 
                 if (isGloballyRevealed || isIndividuallyRevealed) {
@@ -281,16 +282,20 @@ io.on('connection', (socket) => {
         broadcastState();
     });
 
-    // NEU: Input Sperre umschalten
     socket.on('gm_toggle_input_block', (isBlocked) => {
         currentRound.isInputBlocked = isBlocked;
         saveGame();
         broadcastState();
     });
 
+    // --- EINZELNES AUFDECKEN ---
     socket.on('gm_reveal_single', (playerName) => {
+        // Sicherstellen, dass Array existiert
+        if (!currentRound.revealedAnswers) currentRound.revealedAnswers = [];
+        
+        // Nur hinzufügen, wenn noch nicht drin
         if (!currentRound.revealedAnswers.includes(playerName)) {
-            currentRound.revealedAnswers.push(playerName);
+            currentRound.revealedAnswers.push(playerName); // Name ans Ende (neuestes Element)
             saveGame();
             broadcastState();
         }
@@ -353,17 +358,10 @@ io.on('connection', (socket) => {
             shuffledRight = shuffleArray(rightSide);
         }
 
-        // Logic: Should answering be open by default?
-        // PASSIVE Modes (Info, Video, Offline) -> No answering
         let shouldOpen = true;
         if (data.type === 'INFO' || data.type === 'VIDEO_STREAM' || data.type === 'OFFLINE_RESULTS') {
             shouldOpen = false;
         }
-
-        // NEU: Wenn ein Bild dabei ist, standardmäßig erstmal blockieren?
-        // Oder wir lassen es offen und der GM blockiert manuell. 
-        // Für den Workflow "Erst Bild, dann tippen" ist manuell flexibler.
-        // Wir setzen isInputBlocked standardmäßig auf FALSE, der GM kann klicken.
 
         currentRound = {
             type: data.type,
@@ -382,10 +380,10 @@ io.on('connection', (socket) => {
             textRevealed: true, 
             videoData: data.videoData || null,
             powerVoter: data.powerVoter || [],
-            revealedAnswers: [], 
+            revealedAnswers: [], // Reset für neue Runde
             revealed: false,
             answeringOpen: shouldOpen,
-            isInputBlocked: false, // Standard offen
+            isInputBlocked: false, 
             startTime: Date.now(), 
             endTime: null
         };
@@ -400,7 +398,7 @@ io.on('connection', (socket) => {
     });
 
     function archiveCurrentQuestion() {
-        if (currentRound.type !== 'WAITING' && currentRound.type !== 'INFO') { // Keine Archivierung für reine Infos
+        if (currentRound.type !== 'WAITING' && currentRound.type !== 'INFO') { 
             const roundAnswers = {};
             for(const [name, p] of Object.entries(players)) {
                 if (p.hasAnswered && p.answer) roundAnswers[name] = p.answer;
@@ -492,7 +490,6 @@ io.on('connection', (socket) => {
         if (p.lives <= 0) return;
         if (currentRound.targetPlayers?.length > 0 && !currentRound.targetPlayers.includes(data.user)) return;
         
-        // NEU: Nur erlauben, wenn nicht geblockt
         if (currentRound.answeringOpen && !currentRound.isInputBlocked) {
             p.answer = data.answer;
             p.hasAnswered = true;
