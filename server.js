@@ -37,14 +37,16 @@ const DEFAULT_ROUND = {
     type: 'WAITING', question: '', 
     options: [], pairs: [], shuffledRight: [], targetPlayers: [], 
     min: 0, max: 100, 
-    answerCount: 1, // NEU: Für Aufzählen-Modus
+    answerCount: 1, 
     revealed: false, answeringOpen: false, 
     correctAnswer: null,
     audioData: null, 
     imageData: null,
-    imageRevealed: false, // NEU: Bild Toggle Status
+    imageRevealed: false, 
+    textRevealed: true, 
     videoData: null,
     powerVoter: [],
+    revealedAnswers: [], 
     startTime: null, 
     endTime: null    
 };
@@ -109,7 +111,9 @@ async function loadGameData() {
                 imageData: null,
                 videoData: loadedRound.videoData || null,
                 powerVoter: loadedRound.powerVoter || [],
-                imageRevealed: loadedRound.imageRevealed || false
+                imageRevealed: loadedRound.imageRevealed || false,
+                textRevealed: loadedRound.textRevealed !== undefined ? loadedRound.textRevealed : true,
+                revealedAnswers: loadedRound.revealedAnswers || []
             };
             
             sessionHistory = data.sessionHistory || [];
@@ -158,7 +162,15 @@ io.on('connection', (socket) => {
             const publicPlayers = {};
             for (const [name, data] of Object.entries(players)) {
                 if (!data.isVerified) continue;
-                const answerVisible = currentRound.revealed ? data.answer : null;
+                
+                let answerVisible = null;
+                const isGloballyRevealed = currentRound.revealed;
+                const isIndividuallyRevealed = currentRound.revealedAnswers && currentRound.revealedAnswers.includes(name);
+
+                if (isGloballyRevealed || isIndividuallyRevealed) {
+                    answerVisible = data.answer;
+                }
+
                 publicPlayers[name] = { 
                     lives: data.lives, 
                     hasAnswered: data.hasAnswered,
@@ -255,11 +267,24 @@ io.on('connection', (socket) => {
         io.emit('audio_sync_command', data);
     });
     
-    // NEU: Bild Toggle
     socket.on('gm_toggle_image', (shouldShow) => {
         currentRound.imageRevealed = !!shouldShow;
         saveGame();
         broadcastState();
+    });
+
+    socket.on('gm_toggle_text', (shouldShow) => {
+        currentRound.textRevealed = !!shouldShow;
+        saveGame();
+        broadcastState();
+    });
+
+    socket.on('gm_reveal_single', (playerName) => {
+        if (!currentRound.revealedAnswers.includes(playerName)) {
+            currentRound.revealedAnswers.push(playerName);
+            saveGame();
+            broadcastState();
+        }
     });
 
     socket.on('gm_set_bulk_answers', (answersMap) => {
@@ -319,6 +344,13 @@ io.on('connection', (socket) => {
             shuffledRight = shuffleArray(rightSide);
         }
 
+        // Logic: Should answering be open by default?
+        // PASSIVE Modes (Info, Video, Offline) -> No answering
+        let shouldOpen = true;
+        if (data.type === 'INFO' || data.type === 'VIDEO_STREAM' || data.type === 'OFFLINE_RESULTS') {
+            shouldOpen = false;
+        }
+
         currentRound = {
             type: data.type,
             question: data.question,
@@ -328,15 +360,17 @@ io.on('connection', (socket) => {
             targetPlayers: data.targetPlayers || [], 
             min: data.min !== undefined ? Number(data.min) : 0,
             max: data.max !== undefined ? Number(data.max) : 100,
-            answerCount: data.answerCount !== undefined ? Number(data.answerCount) : 1, // NEU
+            answerCount: data.answerCount !== undefined ? Number(data.answerCount) : 1,
             correctAnswer: correctAnswer, 
             audioData: data.audioData || null, 
             imageData: data.imageData || null,
-            imageRevealed: false, // Standardmäßig versteckt bei Rundenstart
+            imageRevealed: false, 
+            textRevealed: true, 
             videoData: data.videoData || null,
             powerVoter: data.powerVoter || [],
+            revealedAnswers: [], 
             revealed: false,
-            answeringOpen: true,
+            answeringOpen: shouldOpen, // Angepasst
             startTime: Date.now(), 
             endTime: null
         };
@@ -351,7 +385,7 @@ io.on('connection', (socket) => {
     });
 
     function archiveCurrentQuestion() {
-        if (currentRound.type !== 'WAITING') {
+        if (currentRound.type !== 'WAITING' && currentRound.type !== 'INFO') { // Keine Archivierung für reine Infos
             const roundAnswers = {};
             for(const [name, p] of Object.entries(players)) {
                 if (p.hasAnswered && p.answer) roundAnswers[name] = p.answer;
