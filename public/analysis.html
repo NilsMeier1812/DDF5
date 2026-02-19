@@ -3,22 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Spiel-Auswertung: Einzelansicht</title>
+    <title>Spiel-Auswertung: Direktansicht</title>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; background: #1a1a1a; color: #e0e0e0; display: flex; height: 100vh; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; background: #1a1a1a; color: #e0e0e0; min-height: 100vh; }
         
-        /* SIDEBAR */
-        .sidebar { width: 300px; background: #252525; border-right: 1px solid #444; overflow-y: auto; display: flex; flex-direction: column;}
-        .sidebar-header { padding: 20px; background: #111; color: #3498db; text-align: center; font-weight: bold; border-bottom: 1px solid #333; }
-        .game-item { padding: 15px 20px; border-bottom: 1px solid #333; cursor: pointer; transition: background 0.2s; }
-        .game-item:hover { background: #333; }
-        .game-item.active { background: #3498db; color: white; border-left: 5px solid #fff; }
-        .game-date { font-size: 0.9rem; font-weight: bold; }
-        .game-id { font-size: 0.7rem; color: #888; font-family: monospace; }
-        .game-item.active .game-id { color: #ddd; }
+        /* SIDEBAR ENTFERNT */
 
-        /* MAIN CONTENT */
-        .content { flex: 1; padding: 40px; overflow-y: auto; }
+        /* MAIN CONTENT - Jetzt volle Breite */
+        .content { width: 100%; max-width: 1200px; margin: 0 auto; padding: 40px; box-sizing: border-box; }
         .header { margin-bottom: 30px; border-bottom: 1px solid #444; padding-bottom: 10px; }
         .header h1 { margin: 0; font-size: 2rem; color: #fff; }
         
@@ -52,18 +44,10 @@
 </head>
 <body>
 
-    <div class="sidebar">
-        <div class="sidebar-header">SPIEL-ARCHIV</div>
-        <div id="game-list">
-            <!-- Wird per JS gefüllt -->
-        </div>
-    </div>
+    <!-- Keine Sidebar mehr -->
 
     <div class="content" id="content-area">
-        <div style="text-align:center; color:#555; margin-top:100px;">
-            <h2>Bitte Spiel links auswählen</h2>
-            <p>Klicken, um Details zu laden.</p>
-        </div>
+        <div class="loading">Verbinde und lade Spiel game_1771440909023...</div>
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
@@ -71,42 +55,11 @@
         const socket = io();
         const FIXED_GAME_ID = "game_1771440909023";
 
-        // Sobald die Seite geladen ist, rendern wir den statischen Button
-        document.addEventListener('DOMContentLoaded', () => {
-            renderStaticSidebar();
-        });
-
         socket.on('connect', () => {
-            console.log("Verbunden. Bereit für Abfragen.");
-            // Wir fragen KEINE Liste mehr an ('request_gamelist' entfernt)
+            console.log("Verbunden. Fordere Spieldaten an...");
+            // Sofortige Abfrage des festen Spiels ohne Nutzerinteraktion
+            socket.emit('request_game_details', FIXED_GAME_ID);
         });
-
-        function renderStaticSidebar() {
-            const list = document.getElementById('game-list');
-            list.innerHTML = '';
-            
-            const el = document.createElement('div');
-            el.className = 'game-item';
-            
-            // Da wir keine Metadaten (Datum/Spieleranzahl) haben, bevor wir draufklicken,
-            // setzen wir hier Platzhalter-Texte ein.
-            el.innerHTML = `
-                <div class="game-date">Gespeichertes Spiel</div>
-                <div class="game-id">${FIXED_GAME_ID}</div>
-            `;
-            el.onclick = () => loadGame(FIXED_GAME_ID, el);
-            list.appendChild(el);
-        }
-
-        function loadGame(gameId, element) {
-            document.querySelectorAll('.game-item').forEach(e => e.classList.remove('active'));
-            element.classList.add('active');
-            
-            document.getElementById('content-area').innerHTML = '<div class="loading">Lade Daten für ' + gameId + '...</div>';
-            
-            // Die Detail-Abfrage bleibt gleich, da der Server die ID ja kennt
-            socket.emit('request_game_details', gameId);
-        }
 
         socket.on('receive_game_details', (data) => {
             console.log("Details empfangen:", data);
