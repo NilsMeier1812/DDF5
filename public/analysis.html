@@ -3,130 +3,108 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Spiel-Auswertung</title>
+    <title>Spiel-Auswertung: Einzelansicht</title>
     <style>
-        :root {
-            --bg-color: #0f172a;
-            --sidebar-bg: #1e293b;
-            --card-bg: #334155;
-            --text-main: #f1f5f9;
-            --text-muted: #94a3b8;
-            --accent: #38bdf8;
-            --success: #22c55e;
-            --border: #475569;
-        }
-
-        body { font-family: 'Inter', 'Segoe UI', sans-serif; margin: 0; padding: 0; background: var(--bg-color); color: var(--text-main); display: flex; height: 100vh; overflow: hidden; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; background: #1a1a1a; color: #e0e0e0; display: flex; height: 100vh; }
         
         /* SIDEBAR */
-        .sidebar { width: 320px; background: var(--sidebar-bg); border-right: 1px solid var(--border); overflow-y: auto; display: flex; flex-direction: column; flex-shrink: 0;}
-        .sidebar-header { padding: 25px; background: rgba(0,0,0,0.2); color: var(--accent); text-align: center; font-weight: 800; letter-spacing: 1px; font-size: 1.2rem; text-transform: uppercase; border-bottom: 1px solid var(--border); }
-        .game-item { padding: 20px 25px; border-bottom: 1px solid rgba(255,255,255,0.05); cursor: pointer; transition: background 0.2s; }
-        .game-item:hover { background: rgba(255,255,255,0.05); }
-        .game-item.active { background: rgba(56, 189, 248, 0.1); border-left: 4px solid var(--accent); }
-        .game-date { font-size: 1rem; font-weight: 600; color: var(--text-main); margin-bottom: 5px; }
-        .game-id { font-size: 0.8rem; color: var(--text-muted); font-family: monospace; }
-        .game-item.active .game-id { color: #bae6fd; }
+        .sidebar { width: 300px; background: #252525; border-right: 1px solid #444; overflow-y: auto; display: flex; flex-direction: column;}
+        .sidebar-header { padding: 20px; background: #111; color: #3498db; text-align: center; font-weight: bold; border-bottom: 1px solid #333; }
+        .game-item { padding: 15px 20px; border-bottom: 1px solid #333; cursor: pointer; transition: background 0.2s; }
+        .game-item:hover { background: #333; }
+        .game-item.active { background: #3498db; color: white; border-left: 5px solid #fff; }
+        .game-date { font-size: 0.9rem; font-weight: bold; }
+        .game-id { font-size: 0.7rem; color: #888; font-family: monospace; }
+        .game-item.active .game-id { color: #ddd; }
 
         /* MAIN CONTENT */
-        .content { flex: 1; padding: 50px; overflow-y: auto; max-width: 1200px; margin: 0 auto; width: 100%;}
-        .header { margin-bottom: 40px; border-bottom: 1px solid var(--border); padding-bottom: 20px; }
-        .header h1 { margin: 0; font-size: 2.5rem; font-weight: 800; letter-spacing: -1px; }
-        .meta-info { margin-top: 10px; color: var(--text-muted); font-size: 1.1rem; }
+        .content { flex: 1; padding: 40px; overflow-y: auto; }
+        .header { margin-bottom: 30px; border-bottom: 1px solid #444; padding-bottom: 10px; }
+        .header h1 { margin: 0; font-size: 2rem; color: #fff; }
         
         /* ROUND BLOCK */
-        .round-block { background: var(--sidebar-bg); margin-bottom: 40px; border-radius: 16px; overflow: hidden; border: 1px solid var(--border); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3); }
-        .round-header { background: rgba(255,255,255,0.03); padding: 20px 30px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); }
-        .round-title { font-size: 1.4rem; font-weight: 700; color: var(--accent); }
+        .round-block { background: #2c2c2c; margin-bottom: 30px; border-radius: 10px; overflow: hidden; border: 1px solid #444; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+        .round-header { background: #333; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #444; }
+        .round-title { font-size: 1.2rem; font-weight: bold; color: #f1c40f; }
         
         /* LIVES DISPLAY */
-        .lives-bar { display: flex; gap: 15px; padding: 20px 30px; background: rgba(0,0,0,0.2); overflow-x: auto; border-bottom: 1px solid var(--border); }
-        .lives-bar::-webkit-scrollbar { height: 8px; }
-        .lives-bar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
-        .life-badge { background: var(--card-bg); padding: 8px 16px; border-radius: 20px; font-size: 0.9rem; display: flex; align-items: center; gap: 8px; flex-shrink: 0; border: 1px solid transparent; }
-        .life-dead { opacity: 0.5; text-decoration: line-through; border-color: #ef4444; color: #ef4444; background: rgba(239, 68, 68, 0.1); }
+        .lives-bar { display: flex; gap: 15px; padding: 10px 20px; background: #222; overflow-x: auto; border-bottom: 1px solid #333; }
+        .life-badge { background: #444; padding: 5px 10px; border-radius: 15px; font-size: 0.8rem; display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
+        .life-dead { opacity: 0.5; text-decoration: line-through; }
         
         /* QUESTIONS LIST */
         .questions-list { padding: 0; }
-        .q-item { padding: 30px; border-bottom: 1px solid var(--border); }
+        .q-item { padding: 20px; border-bottom: 1px solid #3a3a3a; }
         .q-item:last-child { border-bottom: none; }
-        .q-text { font-size: 1.3rem; font-weight: 600; margin-bottom: 15px; color: #fff; line-height: 1.4; }
-        .q-meta { font-size: 0.8rem; color: var(--accent); margin-bottom: 15px; text-transform: uppercase; letter-spacing: 1.5px; font-weight: 800; display: inline-block; background: rgba(56, 189, 248, 0.1); padding: 4px 8px; border-radius: 4px; }
-        .q-correct { background: rgba(34, 197, 94, 0.1); color: #4ade80; padding: 10px 15px; border-radius: 8px; display: inline-block; margin-bottom: 20px; font-size: 1rem; border: 1px solid rgba(34, 197, 94, 0.3); font-weight: 600; }
+        .q-text { font-size: 1.1rem; font-weight: bold; margin-bottom: 10px; color: #ddd; }
+        .q-meta { font-size: 0.8rem; color: #888; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 1px; }
+        .q-correct { background: #1b4f25; color: #8fd19e; padding: 5px 10px; border-radius: 4px; display: inline-block; margin-bottom: 10px; font-size: 0.9rem;}
         
         /* ANSWERS GRID */
-        .answers-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 15px; }
-        .ans-card { background: rgba(255,255,255,0.05); padding: 15px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05); transition: transform 0.2s; }
-        .ans-card:hover { background: rgba(255,255,255,0.08); }
-        .ans-user { font-size: 0.85rem; color: var(--text-muted); font-weight: bold; margin-bottom: 5px; text-transform: uppercase; }
-        .ans-val { color: #fff; white-space: pre-wrap; font-size: 1.1rem;}
+        .answers-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; }
+        .ans-card { background: #3a3a3a; padding: 10px; border-radius: 5px; }
+        .ans-user { font-size: 0.8rem; color: #aaa; font-weight: bold; margin-bottom: 3px; }
+        .ans-val { color: #fff; white-space: pre-wrap; font-size: 0.95rem;}
         
-        .loading { text-align: center; color: var(--text-muted); margin-top: 100px; font-size: 1.2rem; }
-        .error-msg { text-align: center; color: #ef4444; margin-top: 50px; font-weight: bold; font-size: 1.2rem; background: rgba(239, 68, 68, 0.1); padding: 20px; border-radius: 12px; }
-        
-        /* EMPTY STATE */
-        .empty-state { text-align: center; margin-top: 100px; color: var(--border); }
-        .empty-state h2 { font-size: 2rem; color: var(--text-muted); }
+        .loading { text-align: center; color: #666; margin-top: 50px; font-style: italic; }
+        .error-msg { text-align: center; color: #e74c3c; margin-top: 50px; font-weight: bold; }
     </style>
 </head>
 <body>
 
     <div class="sidebar">
-        <div class="sidebar-header">Archiv</div>
+        <div class="sidebar-header">SPIEL-ARCHIV</div>
         <div id="game-list">
-            <div class="loading" style="font-size:1rem; margin-top:20px;">Lade Spiele...</div>
+            <!-- Wird per JS gefüllt -->
         </div>
     </div>
 
     <div class="content" id="content-area">
-        <div class="empty-state">
-            <h2>Wähle ein Spiel</h2>
-            <p>Klicke links auf einen Eintrag, um Details zu sehen.</p>
+        <div style="text-align:center; color:#555; margin-top:100px;">
+            <h2>Bitte Spiel links auswählen</h2>
+            <p>Klicken, um Details zu laden.</p>
         </div>
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io();
+        const FIXED_GAME_ID = "game_1771440909023";
 
-        socket.on('connect', () => {
-            console.log("Verbunden. Lade Liste...");
-            socket.emit('request_gamelist');
+        // Sobald die Seite geladen ist, rendern wir den statischen Button
+        document.addEventListener('DOMContentLoaded', () => {
+            renderStaticSidebar();
         });
 
-        socket.on('receive_gamelist', (games) => {
+        socket.on('connect', () => {
+            console.log("Verbunden. Bereit für Abfragen.");
+            // Wir fragen KEINE Liste mehr an ('request_gamelist' entfernt)
+        });
+
+        function renderStaticSidebar() {
             const list = document.getElementById('game-list');
             list.innerHTML = '';
             
-            if(games.length === 0) {
-                list.innerHTML = '<div style="padding:30px; color:#666; text-align:center;">Keine Spiele gefunden.</div>';
-                return;
-            }
-
-            games.forEach((game, index) => {
-                const el = document.createElement('div');
-                el.className = 'game-item';
-                
-                let dateStr = "Unbekannt";
-                try {
-                    dateStr = new Date(game.date).toLocaleString('de-DE', { weekday: 'short', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute:'2-digit' });
-                } catch(e) {}
-
-                el.innerHTML = `
-                    <div class="game-date">${dateStr}</div>
-                    <div class="game-id">${game.id} • ${game.playersCount} Spieler</div>
-                `;
-                el.onclick = () => loadGame(game.id, el);
-                list.appendChild(el);
-            });
-        });
+            const el = document.createElement('div');
+            el.className = 'game-item';
+            
+            // Da wir keine Metadaten (Datum/Spieleranzahl) haben, bevor wir draufklicken,
+            // setzen wir hier Platzhalter-Texte ein.
+            el.innerHTML = `
+                <div class="game-date">Gespeichertes Spiel</div>
+                <div class="game-id">${FIXED_GAME_ID}</div>
+            `;
+            el.onclick = () => loadGame(FIXED_GAME_ID, el);
+            list.appendChild(el);
+        }
 
         function loadGame(gameId, element) {
             document.querySelectorAll('.game-item').forEach(e => e.classList.remove('active'));
             element.classList.add('active');
             
-            document.getElementById('content-area').innerHTML = '<div class="loading">Lade Details für ' + gameId + '...</div>';
+            document.getElementById('content-area').innerHTML = '<div class="loading">Lade Daten für ' + gameId + '...</div>';
             
+            // Die Detail-Abfrage bleibt gleich, da der Server die ID ja kennt
             socket.emit('request_game_details', gameId);
         }
 
@@ -144,20 +122,21 @@
             const players = meta.players || {};
             const pCount = Object.keys(players).length;
             
+            // Datum sicher parsen
             let dateStr = '-';
             try {
-                if (meta.lastUpdated) dateStr = new Date(meta.lastUpdated).toLocaleString('de-DE');
+                if (meta.lastUpdated) dateStr = new Date(meta.lastUpdated).toLocaleString();
             } catch (e) { console.error("Datumsfehler:", e); }
 
             let html = `
                 <div class="header">
-                    <h1>Spielbericht</h1>
-                    <div class="meta-info">${dateStr} | ID: ${meta.gameId} | ${pCount} Spieler</div>
+                    <h1>Spiel vom ${dateStr}</h1>
+                    <div style="color:#888;">ID: ${meta.gameId} | ${pCount} Spieler</div>
                 </div>
             `;
 
             if (!rounds || rounds.length === 0) {
-                html += '<div style="text-align:center; color:#666; font-size:1.2rem; padding:40px;">Keine Runden-Daten verfügbar (Spiel wurde evtl. resettet).</div>';
+                html += '<div style="text-align:center; color:#666;">Keine Runden-Daten verfügbar (oder Spiel wurde resettet).</div>';
                 container.innerHTML = html;
                 return;
             }
@@ -168,7 +147,7 @@
                     for (const [name, lives] of Object.entries(round.playerLives)) {
                         const isDead = lives <= 0 ? 'life-dead' : '';
                         const heart = lives <= 0 ? '💀' : '❤️ ' + lives;
-                        livesHtml += `<div class="life-badge ${isDead}">${name} <span style="font-weight:bold;">${heart}</span></div>`;
+                        livesHtml += `<div class="life-badge ${isDead}">${name} ${heart}</div>`;
                     }
                 }
 
@@ -203,14 +182,14 @@
                         `;
                     });
                 } else {
-                    qHtml = '<div style="padding:30px; color:#666; text-align:center;">Keine Fragen in dieser Runde.</div>';
+                    qHtml = '<div style="padding:20px; color:#666;">Keine Fragen in dieser Runde.</div>';
                 }
 
                 html += `
                     <div class="round-block">
                         <div class="round-header">
                             <span class="round-title">Runde ${round.roundId}</span>
-                            <span style="font-size:0.9rem; color:var(--text-muted); font-weight:bold;">${round.questions ? round.questions.length : 0} Fragen</span>
+                            <span style="font-size:0.8rem; color:#888;">${round.questions ? round.questions.length : 0} Fragen</span>
                         </div>
                         <div class="lives-bar">${livesHtml}</div>
                         <div class="questions-list">${qHtml}</div>
@@ -231,6 +210,7 @@
             }
             return val;
         }
+
     </script>
 </body>
 </html>
